@@ -1,0 +1,3 @@
+{
+  "/(dashboard)/stock-count/page": "app/(dashboard)/stock-count/page.js"
+}
