@@ -1,0 +1,266 @@
+{
+  "entities": {
+    "Product": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Product",
+      "type": "object",
+      "description": "Represents a product in the catalog.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the product."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the product."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the product."
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "URL of the product image.",
+          "format": "uri"
+        },
+        "price": {
+          "type": "number",
+          "description": "Price of the product."
+        },
+        "category": {
+          "type": "string",
+          "description": "Category the product belongs to."
+        },
+        "stockLevel": {
+          "type": "number",
+          "description": "Current stock level of the product."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "imageUrl",
+        "price",
+        "category",
+        "stockLevel"
+      ]
+    },
+    "Sale": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Sale",
+      "type": "object",
+      "description": "Represents a sale transaction.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the sale."
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to Product. (Relationship: Product 1:N Sale)"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Quantity of the product sold."
+        },
+        "saleDate": {
+          "type": "string",
+          "description": "Date and time of the sale.",
+          "format": "date-time"
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "Total amount of the sale."
+        }
+      },
+      "required": [
+        "id",
+        "productId",
+        "quantity",
+        "saleDate",
+        "totalAmount"
+      ]
+    },
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user profile.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user profile."
+        },
+        "username": {
+          "type": "string",
+          "description": "Username of the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Full name of the user."
+        },
+        "role": {
+          "type": "string",
+          "description": "Role of the user (e.g., admin, manager, employee)."
+        }
+      },
+      "required": [
+        "id",
+        "username",
+        "email",
+        "fullName",
+        "role"
+      ]
+    },
+    "StockCount": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "StockCount",
+      "type": "object",
+      "description": "Represents a stock count event for a product.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the stock count event."
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to Product. (Relationship: Product 1:N StockCount)"
+        },
+        "countDate": {
+          "type": "string",
+          "description": "Date and time of the stock count.",
+          "format": "date-time"
+        },
+        "countedQuantity": {
+          "type": "number",
+          "description": "The counted stock quantity."
+        },
+        "expectedQuantity": {
+          "type": "number",
+          "description": "The expected stock quantity based on records."
+        },
+        "discrepancy": {
+          "type": "number",
+          "description": "The difference between counted and expected quantities."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Any notes regarding the stock count."
+        }
+      },
+      "required": [
+        "id",
+        "productId",
+        "countDate",
+        "countedQuantity",
+        "expectedQuantity",
+        "discrepancy"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores user profile information. Uses path-based ownership for data privacy. Includes denormalized 'userId' for simplified security rules.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/products/{productId}",
+        "definition": {
+          "entityName": "Product",
+          "schema": {
+            "$ref": "#/backend/entities/Product"
+          },
+          "description": "Stores product catalog information. Includes fields like name, description, image URL, price, category, and stock level.",
+          "params": [
+            {
+              "name": "productId",
+              "description": "The unique identifier of the product."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/products/{productId}/sales/{saleId}",
+        "definition": {
+          "entityName": "Sale",
+          "schema": {
+            "$ref": "#/backend/entities/Sale"
+          },
+          "description": "Stores sales transaction data related to a specific product. Includes fields like quantity, sale date, and total amount. Includes denormalized 'productId' for query optimization and security.",
+          "params": [
+            {
+              "name": "productId",
+              "description": "The unique identifier of the product."
+            },
+            {
+              "name": "saleId",
+              "description": "The unique identifier of the sale transaction."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/products/{productId}/stockCounts/{stockCountId}",
+        "definition": {
+          "entityName": "StockCount",
+          "schema": {
+            "$ref": "#/backend/entities/StockCount"
+          },
+          "description": "Stores stock count event data for a specific product. Includes fields like count date, counted quantity, expected quantity, discrepancy, and notes. Includes denormalized 'productId' for query optimization and security.",
+          "params": [
+            {
+              "name": "productId",
+              "description": "The unique identifier of the product."
+            },
+            {
+              "name": "stockCountId",
+              "description": "The unique identifier of the stock count event."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "roles_admin",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Collection for storing admin role assignments. Document existence determines admin privileges.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to address the error related to network connectivity issues reported by Next.js, while also adhering to the principles of Authorization Independence, Structural Segregation, Access Modeling, and Data Clarity. Since the error is related to the app losing its connection to the backend, this is unrelated to Firestore structure. I will generate a structure based on the app's specifications, though. User profiles are stored separately from the products and sales data and are accessed based on the user's unique ID. Product and sales data are also segregated into their respective collections. Path-based ownership is used for user profiles. The structure promotes clear security rules and efficient data retrieval."
+  }
+}
