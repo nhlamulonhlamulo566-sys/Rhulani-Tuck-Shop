@@ -7,6 +7,7 @@ import {
   CollectionReference,
   DocumentData,
   onSnapshot,
+  getDocs,
 } from 'firebase/firestore';
 
 import { getStore } from './firestore-store';
@@ -40,18 +41,35 @@ export function useCollection<T>(
     assertMemoized(target);
     return getStore<(T & { id: string })[]>(
       target.__key,
-      (onNext, onError) =>
-        onSnapshot(
-          target,
-          (snap) =>
+      (onNext, onError) => {
+        let unsub: () => void = () => {};
+
+        // First try to fetch a fast initial snapshot using getDocs()
+        // so UIs like POS don't wait for the realtime listener to warm up.
+        getDocs(target)
+          .then((snap) => {
             onNext(
-              snap.docs.map((d) => ({
-                ...(d.data() as T),
-                id: d.id,
-              })),
-            ),
-          onError,
-        ),
+              snap.docs.map((d) => ({ ...(d.data() as T), id: d.id })),
+            );
+          })
+          .catch((err) => {
+            // If initial fetch fails, notify the store error but continue to set up onSnapshot
+            onError(err);
+          })
+          .finally(() => {
+            // Then subscribe to realtime updates
+            unsub = onSnapshot(
+              target,
+              (snap) =>
+                onNext(
+                  snap.docs.map((d) => ({ ...(d.data() as T), id: d.id })),
+                ),
+              onError,
+            );
+          });
+
+        return () => unsub();
+      },
     );
   }, [target]);
 
