@@ -76,6 +76,8 @@
     visibility: visible;
   }
   .print-receipt-container {
+    /* Ensure the receipt is rendered for print even if hidden via display:none */
+    display: block !important;
     position: absolute;
     left: 0;
     top: 0;
