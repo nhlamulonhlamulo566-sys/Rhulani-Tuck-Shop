@@ -1,0 +1,64 @@
+{
+  "placeholderImages": [
+    {
+      "id": "prod-1",
+      "description": "A stylish wireless headphone.",
+      "imageUrl": "https://images.unsplash.com/photo-1641048930621-ab5d225ae5b0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx3aXJlbGVzcyUyMGhlYWRwaG9uZXxlbnwwfHx8fDE3Njc1OTk1MDV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "wireless headphone"
+    },
+    {
+      "id": "prod-2",
+      "description": "A modern smartwatch with a black strap.",
+      "imageUrl": "https://images.unsplash.com/photo-1632794716789-42d9995fb5b6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxzbWFydHdhdGNofGVufDB8fHx8MTc2NzUzMzkxNnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "smartwatch"
+    },
+    {
+      "id": "prod-3",
+      "description": "A sleek and powerful laptop.",
+      "imageUrl": "https://images.unsplash.com/photo-1515378960530-7c0da6231fb1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxsYXB0b3B8ZW58MHx8fHwxNzY3NTY3ODYwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "laptop"
+    },
+    {
+      "id": "prod-4",
+      "description": "A professional-grade digital camera.",
+      "imageUrl": "https://images.unsplash.com/photo-1612232099404-0ca09938afac?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxkaWdpdGFsJTIwY2FtZXJhfGVufDB8fHx8MTc2NzUzNzA1M3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "digital camera"
+    },
+    {
+      "id": "prod-5",
+      "description": "A comfortable ergonomic office chair.",
+      "imageUrl": "https://images.unsplash.com/photo-1633789638578-eef0da1dc063?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxvZmZpY2UlMjBjaGFpcnxlbnwwfHx8fDE3Njc0ODExMTR8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "office chair"
+    },
+    {
+      "id": "prod-6",
+      "description": "A minimalist wooden desk.",
+      "imageUrl": "https://images.unsplash.com/photo-1519219788971-8d9797e0928e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx3b29kZW4lMjBkZXNrfGVufDB8fHx8MTc2NzU1MTI3NXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "wooden desk"
+    },
+    {
+      "id": "prod-7",
+      "description": "A set of ceramic coffee mugs.",
+      "imageUrl": "https://images.unsplash.com/photo-1577594829182-ff8eb109760e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxjb2ZmZWUlMjBtdWdzfGVufDB8fHx8MTc2NzU2NzE1MXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "coffee mugs"
+    },
+    {
+      "id": "prod-8",
+      "description": "A green indoor plant in a pot.",
+      "imageUrl": "https://images.unsplash.com/photo-1620803366004-119b57f54cd6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxpbmRvb3IlMjBwbGFudHxlbnwwfHx8fDE3Njc1MzA3NjN8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "indoor plant"
+    },
+    {
+      "id": "prod-9",
+      "description": "A leather-bound notebook and a pen.",
+      "imageUrl": "https://images.unsplash.com/photo-1620233317289-5c035358aa8a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxub3RlYm9vayUyMHBlbnxlbnwwfHx8fDE3Njc1OTk1MDV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "notebook pen"
+    },
+    {
+      "id": "prod-10",
+      "description": "A portable bluetooth speaker.",
+      "imageUrl": "https://images.unsplash.com/photo-1582978571763-2d039e56f0c3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxibHVldG9vdGglMjBzcGVha2VyfGVufDB8fHx8MTc2NzU0MTc0M3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "bluetooth speaker"
+    }
+  ]
+}

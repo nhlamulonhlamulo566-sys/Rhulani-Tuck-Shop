@@ -1,0 +1,125 @@
+/**
+ * Core Philosophy: This ruleset implements a Role-Based Access Control (RBAC) model.
+ * There are two primary roles: 'user' and 'admin'. Admins have broad read/write
+ * access to business data like products and sales. Regular signed-in users can read
+ * public data (the product catalog) and have full control over their own user profile,
+ * but cannot access other users' data or business-critical collections.
+ *
+ * Data Structure: The data is organized into logical top-level collections:
+ * - /users/{userId}: Private user-specific data, which includes the user's role.
+ * - /products/{productId}: The public-facing product catalog.
+ * - /sales/{saleId}: Collection for all sales transactions.
+ *
+ * Key Security Decisions:
+ * - Admin Status: A user is considered an 'admin' if their document in the /users
+ *   collection has a 'role' field set to 'administration'. This is the source of truth for privileges.
+ * - User Data Privacy: User profiles are strictly private. A user can only access
+ *   their own document within the /users collection. Listing the entire /users
+ *   collection is explicitly disallowed, except for admins.
+ * - Product Catalog: The product catalog is readable by any signed-in user but
+ *   can only be managed (created, updated, deleted) by admins.
+ * - Business Data: Collections like 'sales' are readable by any signed-in user for
+ *   reporting, but only manageable by admins (for voiding).
+ * - Default Posture: Access is denied by default. All permissions must be
+ *   explicitly granted. Anonymous (not signed-in) users have no access.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------------
+    // Helper Functions
+    // ------------------------------------------------------------------------
+
+    /**
+     * isSignedIn
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * isOwner
+     * Checks if the authenticated user's UID matches the provided userId.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * isAdmin
+     * Checks if the requesting user has the 'administration' role in their user profile.
+     * This is the definitive source of truth for admin privileges.
+     */
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'administration';
+    }
+
+    /**
+     * hasValidUserProfileId
+     * On create, ensures the document's internal `id` field matches its path {userId}.
+     */
+    function hasValidUserProfileId(userId) {
+      return request.resource.data.id == userId;
+    }
+
+
+    // ------------------------------------------------------------------------
+    // Collection Rules
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description   Manages user profiles. Each user has exclusive control over their own document.
+     * @path          /users/{userId}
+     * @allow         (get) A signed-in user accessing their own document, or an admin.
+     * @allow         (list) An admin listing all users for management purposes.
+     * @allow         (create) A user creating their own profile.
+     * @allow         (update) A user updating their own profile, or an admin.
+     * @deny          (delete) A regular user cannot delete their own profile. Only admins can.
+     * @principle     Restricts access to a user's own data tree (Ownership). Validates path and data consistency.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && hasValidUserProfileId(userId);
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    /**
+     * @description   The product catalog. Readable by any signed-in user, but only manageable by admins.
+     * @path          /products/{productId}
+     * @allow         (get, list) Any signed-in user browsing the catalog.
+     * @allow         (create, update, delete) An admin managing a product entry.
+     * @deny          (create, update, delete) A regular signed-in user trying to modify a product.
+     * @deny          (get, list) An anonymous (not signed-in) user.
+     * @principle     Public read for authenticated users with admin-only writes.
+     */
+    match /products/{productId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    /**
+     * @description   Sales transaction records. Writable by any authenticated user for POS functionality.
+     *                Updates (voiding) are restricted to admins. Deletes are disallowed to maintain audit trail.
+     * @path          /sales/{saleId}
+     * @allow         (create) Any signed-in user (for POS).
+     * @allow         (get, list) Any signed-in user.
+     * @allow         (update) Admins only (for voiding transactions).
+     * @deny          (delete) No one can delete a sales record.
+     * @principle     Allows broad creation for core functionality, but restricts sensitive modifications.
+     */
+    match /sales/{saleId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow delete: if false; // Disallow deletes to maintain sales records
+    }
+  }
+}
