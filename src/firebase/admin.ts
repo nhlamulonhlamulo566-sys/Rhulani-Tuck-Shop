@@ -15,9 +15,24 @@ function initializeAdminApp(): App {
   // If environment variable is not set, try reading local firebase-adminsdk.json
   if (!serviceAccountString) {
     try {
-      const localPath = path.resolve(process.cwd(), 'firebase-adminsdk.json');
-      if (fs.existsSync(localPath)) {
-        serviceAccountString = fs.readFileSync(localPath, { encoding: 'utf8' });
+      // Try several candidate locations for a local JSON file so server runtimes
+      // with different working directories still find the service account.
+      const candidates = [
+        path.resolve(process.cwd(), 'firebase-adminsdk.json'),
+        path.resolve(__dirname, '../../firebase-adminsdk.json'),
+        path.resolve(__dirname, '../../../firebase-adminsdk.json'),
+        path.resolve(__dirname, '../../../../firebase-adminsdk.json'),
+      ];
+
+      for (const p of candidates) {
+        try {
+          if (fs.existsSync(p)) {
+            serviceAccountString = fs.readFileSync(p, { encoding: 'utf8' });
+            break;
+          }
+        } catch (err) {
+          // ignore candidate errors and continue
+        }
       }
     } catch (e) {
       // ignore and let validation below handle missing config
