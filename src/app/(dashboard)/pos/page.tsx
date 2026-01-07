@@ -28,7 +28,7 @@ export default function PosPage() {
     [firestore, user]
   );
 
-  const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
+  const { data: products, isLoading: productsLoading, error: productsError } = useCollection<Product>(productsQuery) as any;
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [lastSale, setLastSale] = useState<ReceiptData | null>(null);
@@ -227,6 +227,9 @@ export default function PosPage() {
                   <ProductCard key={product.id} product={product} onAddToCart={() => handleAddToCart(product, 1)} />
                 ))}
               </div>
+            )}
+            {!productsLoading && productsError && (
+              <div className="p-4 text-center text-red-600">Failed to load products: {productsError.message}</div>
             )}
           </ScrollArea>
           <div className="hidden md:block h-full overflow-y-auto">

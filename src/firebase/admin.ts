@@ -27,6 +27,14 @@ function initializeAdminApp(): App {
   if (!serviceAccountString) {
     throw new Error('Firebase Admin SDK config not found. Set FIREBASE_ADMIN_SDK_CONFIG or provide firebase-adminsdk.json at project root.');
   }
+  // Handle quoted env values and escaped newlines (common when storing JSON in .env)
+  if (serviceAccountString.startsWith('"') && serviceAccountString.endsWith('"')) {
+    // remove surrounding quotes
+    serviceAccountString = serviceAccountString.slice(1, -1);
+  }
+
+  // Replace literal \n sequences with real newlines (private_key often contains \n)
+  serviceAccountString = serviceAccountString.replace(/\\n/g, '\n');
 
   try {
     const serviceAccount = JSON.parse(serviceAccountString);
@@ -36,8 +44,9 @@ function initializeAdminApp(): App {
       databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
     }, 'admin');
   } catch (error: any) {
-    console.error('Error parsing Firebase Admin SDK config or initializing app:', error);
-    throw new Error('Failed to initialize Firebase Admin SDK. Please check FIREBASE_ADMIN_SDK_CONFIG or firebase-adminsdk.json for valid JSON.');
+    // Avoid printing secrets; only log a short hint and length
+    console.error('Failed to parse Firebase Admin SDK config (length=', String(serviceAccountString?.length || 0) + "):", error?.message || error);
+    throw new Error('Failed to initialize Firebase Admin SDK. Please check FIREBASE_ADMIN_SDK_CONFIG or firebase-adminsdk.json for valid JSON and correct escaping (e.g. replace literal newlines with \\n).');
   }
 }
 
