@@ -10,12 +10,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import PageHeader from '@/components/page-header';
-import type { TillSession } from '@/lib/types';
+import type { TillSession, Sale } from '@/lib/types';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
-import { Loader2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { collection, query, where } from 'firebase/firestore';
+import { Loader2, TrendingUp, TrendingDown, Minus, Landmark } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { format } from 'date-fns';
+import { format, startOfToday, endOfToday } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +36,19 @@ export default function TillAuditsPage() {
 
   const { data: sessionsUnsorted, isLoading } = useCollection<TillSession>(sessionsQuery);
   
+  const salesQuery = useMemoFirebase(() => {
+    const today = startOfToday();
+    const endOfTodayDate = endOfToday();
+    return query(
+      collection(firestore, 'sales'),
+      where('date', '>=', today.toISOString()),
+      where('date', '<=', endOfTodayDate.toISOString()),
+      where('status', '==', 'Completed')
+    );
+  }, [firestore]);
+
+  const { data: todaySales, isLoading: salesLoading } = useCollection<Sale>(salesQuery);
+  
   const sessions = useMemo(() => {
     if (!sessionsUnsorted) return null;
     return [...sessionsUnsorted].sort((a, b) => {
@@ -44,6 +57,21 @@ export default function TillAuditsPage() {
       return bDate - aDate;
     });
   }, [sessionsUnsorted]);
+
+  const salesBySalesperson = useMemo(() => {
+    if (!todaySales) return {};
+    const summary: Record<string, { netSales: number; count: number }> = {};
+    
+    todaySales.forEach(sale => {
+      if (!summary[sale.salesperson]) {
+        summary[sale.salesperson] = { netSales: 0, count: 0 };
+      }
+      summary[sale.salesperson].netSales += sale.total;
+      summary[sale.salesperson].count += 1;
+    });
+    
+    return summary;
+  }, [todaySales]);
   
   const getDifferenceVariant = (difference: number = 0) => {
     if (difference < 0) return 'destructive';
@@ -68,6 +96,39 @@ export default function TillAuditsPage() {
   return (
     <>
       <PageHeader title="Till Audits" />
+      
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Landmark className="h-5 w-5 text-primary" />
+            Net Sales for Today
+          </CardTitle>
+          <CardDescription>Daily sales summary by salesperson</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {salesLoading ? (
+            <div className="flex justify-center items-center h-24">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : Object.keys(salesBySalesperson).length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(salesBySalesperson).map(([salesperson, data]) => (
+                <div key={salesperson} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
+                  <p className="text-sm font-medium text-muted-foreground mb-1">{salesperson}</p>
+                  <p className="text-2xl font-bold text-primary mb-2">R{data.netSales.toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground">{data.count} transaction{data.count !== 1 ? 's' : ''}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Landmark className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-50" />
+              <p className="text-sm text-muted-foreground">No sales completed today</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Session History</CardTitle>
