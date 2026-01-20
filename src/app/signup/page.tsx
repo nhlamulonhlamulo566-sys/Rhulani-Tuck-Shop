@@ -1,0 +1,15 @@
+"use client"
+
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+
+export default function SignupRedirect() {
+  const router = useRouter()
+
+  useEffect(() => {
+    // Signup removed — redirect users to login
+    router.replace('/login')
+  }, [router])
+
+  return null
+}

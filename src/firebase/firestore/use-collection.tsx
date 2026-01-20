@@ -1,87 +1,99 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useSyncExternalStore } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Query,
-  CollectionReference,
-  DocumentData,
   onSnapshot,
-  getDocs,
+  DocumentData,
+  FirestoreError,
+  QuerySnapshot,
+  CollectionReference,
 } from 'firebase/firestore';
 
-import { getStore } from './firestore-store';
-import { assertMemoized } from './firestore-dev-guards';
+/** Utility type to add an 'id' field to a given type T. */
+export type WithId<T> = T & { id: string };
 
+/**
+ * Interface for the return value of the useCollection hook.
+ * @template T Type of the document data.
+ */
 export interface UseCollectionResult<T> {
-  data: (T & { id: string })[] | null;
-  isLoading: boolean;
-  error: Error | null;
+  data: WithId<T>[] | null; // Document data with ID, or null.
+  isLoading: boolean;       // True if loading.
+  error: FirestoreError | Error | null; // Error object, or null.
 }
 
-const EMPTY_SNAPSHOT = { data: null, error: null, loading: false };
-
-const EMPTY_STORE = {
-  subscribe: () => () => {},
-  getSnapshot: () => EMPTY_SNAPSHOT,
-};
-
-export function useCollection<T>(
-  target:
-    | ((Query<DocumentData> | CollectionReference<DocumentData>) & {
-        __memo: true;
-        __key: string;
-      })
-    | null,
-): UseCollectionResult<T> {
-  const store = useMemo(() => {
-    if (!target) {
-      return EMPTY_STORE;
+/* Internal implementation of Query:
+  https://github.com/firebase/firebase-js-sdk/blob/c5f08a9bc5da0d2b0207802c972d53724ccef055/packages/firestore/src/lite-api/reference.ts#L143
+*/
+export interface InternalQuery extends Query<DocumentData> {
+  _query: {
+    path: {
+      canonicalString(): string;
+      toString(): string;
     }
-    assertMemoized(target);
-    return getStore<(T & { id: string })[]>(
-      target.__key,
-      (onNext, onError) => {
-        let unsub: () => void = () => {};
+  }
+}
 
-        // First try to fetch a fast initial snapshot using getDocs()
-        // so UIs like POS don't wait for the realtime listener to warm up.
-        getDocs(target)
-          .then((snap) => {
-            onNext(
-              snap.docs.map((d) => ({ ...(d.data() as T), id: d.id })),
-            );
-          })
-          .catch((err) => {
-            // If initial fetch fails, notify the store error but continue to set up onSnapshot
-            onError(err);
-          })
-          .finally(() => {
-            // Then subscribe to realtime updates
-            unsub = onSnapshot(
-              target,
-              (snap) =>
-                onNext(
-                  snap.docs.map((d) => ({ ...(d.data() as T), id: d.id })),
-                ),
-              onError,
-            );
-          });
+/**
+ * React hook to subscribe to a Firestore collection or query in real-time.
+ * Handles nullable references/queries.
+ * 
+ *
+ * IMPORTANT! YOU MUST MEMOIZE the inputted memoizedTargetRefOrQuery or BAD THINGS WILL HAPPEN
+ * use useMemo to memoize it per React guidence.  Also make sure that it's dependencies are stable
+ * references
+ *  
+ * @template T Optional type for document data. Defaults to any.
+ * @param {CollectionReference<DocumentData> | Query<DocumentData> | null | undefined} targetRefOrQuery -
+ * The Firestore CollectionReference or Query. Waits if null/undefined.
+ * @returns {UseCollectionResult<T>} Object with data, isLoading, error.
+ */
+export function useCollection<T = any>(
+    memoizedTargetRefOrQuery: ((CollectionReference<DocumentData> | Query<DocumentData>) & {__memo?: boolean})  | null | undefined,
+): UseCollectionResult<T> {
+  type ResultItemType = WithId<T>;
+  type StateDataType = ResultItemType[] | null;
 
-        return () => unsub();
+  const [data, setData] = useState<StateDataType>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<FirestoreError | Error | null>(null);
+
+  useEffect(() => {
+    if (!memoizedTargetRefOrQuery) {
+      setData(null);
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    // Directly use memoizedTargetRefOrQuery as it's assumed to be the final query
+    const unsubscribe = onSnapshot(
+      memoizedTargetRefOrQuery,
+      (snapshot: QuerySnapshot<DocumentData>) => {
+        const results: ResultItemType[] = [];
+        for (const doc of snapshot.docs) {
+          results.push({ ...(doc.data() as T), id: doc.id });
+        }
+        setData(results);
+        setError(null);
+        setIsLoading(false);
       },
+      (err: FirestoreError) => {
+        console.error(err);
+        setError(err);
+        setData(null);
+        setIsLoading(false);
+      }
     );
-  }, [target]);
 
-  const snap = useSyncExternalStore(
-    store.subscribe,
-    store.getSnapshot,
-    store.getSnapshot,
-  );
-
-  return {
-    data: snap.data,
-    isLoading: snap.loading,
-    error: snap.error,
-  };
+    return () => unsubscribe();
+  }, [memoizedTargetRefOrQuery]); // Re-run if the target query/reference changes.
+  if(memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {
+    throw new Error(memoizedTargetRefOrQuery + ' was not properly memoized using useMemoFirebase');
+  }
+  return { data, isLoading, error };
 }

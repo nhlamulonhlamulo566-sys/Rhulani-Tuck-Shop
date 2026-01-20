@@ -1,166 +1,267 @@
 {
   "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user profile in the ClarityCraft application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserProfile entity."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the user."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the user.",
+          "format": "email"
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the user, used for authorization.",
+          "enum": [
+            "Administration",
+            "Sales",
+            "Super Administration"
+          ]
+        },
+        "pin": {
+          "type": "string",
+          "description": "A unique 6-digit PIN for administrators to authorize sensitive actions.",
+          "pattern": "^[0-9]{6}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "The date and time when the user profile was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "email",
+        "role",
+        "createdAt"
+      ]
+    },
     "Product": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Product",
       "type": "object",
-      "description": "Represents a product in the catalog.",
+      "description": "Represents a product in the ClarityCraft application.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the product."
+          "description": "Unique identifier for the Product entity."
         },
         "name": {
           "type": "string",
-          "description": "Name of the product."
+          "description": "The name of the product."
         },
         "description": {
           "type": "string",
-          "description": "Detailed description of the product."
+          "description": "A detailed description of the product."
+        },
+        "price": {
+          "type": "number",
+          "description": "The price of the product."
         },
         "imageUrl": {
           "type": "string",
           "description": "URL of the product image.",
           "format": "uri"
         },
-        "price": {
-          "type": "number",
-          "description": "Price of the product."
-        },
-        "category": {
-          "type": "string",
-          "description": "Category the product belongs to."
-        },
         "stockLevel": {
           "type": "number",
-          "description": "Current stock level of the product."
+          "description": "The current stock level of the product."
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Reference to Category. (Relationship: Category 1:N Product)"
         }
       },
       "required": [
         "id",
         "name",
         "description",
-        "imageUrl",
         "price",
-        "category",
-        "stockLevel"
+        "stockLevel",
+        "categoryId"
+      ]
+    },
+    "Category": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Category",
+      "type": "object",
+      "description": "Represents a product category in the ClarityCraft application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Category entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the category."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the product category."
+        }
+      },
+      "required": [
+        "id",
+        "name"
       ]
     },
     "Sale": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Sale",
       "type": "object",
-      "description": "Represents a sale transaction.",
+      "description": "Represents a sale transaction in the ClarityCraft application.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the sale."
-        },
-        "productId": {
-          "type": "string",
-          "description": "Reference to Product. (Relationship: Product 1:N Sale)"
-        },
-        "quantity": {
-          "type": "number",
-          "description": "Quantity of the product sold."
+          "description": "Unique identifier for the Sale entity."
         },
         "saleDate": {
           "type": "string",
-          "description": "Date and time of the sale.",
+          "description": "The date and time of the sale.",
           "format": "date-time"
         },
         "totalAmount": {
           "type": "number",
-          "description": "Total amount of the sale."
+          "description": "The total amount of the sale."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N Sale)"
+        },
+        "authorizations": {
+          "type": "array",
+          "description": "A log of special authorizations for this sale, like voids or returns.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": { "type": "string" },
+              "userName": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "action": { "type": "string", "enum": ["void", "return"] },
+              "details": { "type": "string" }
+            },
+            "required": ["userId", "userName", "timestamp", "action", "details"]
+          }
         }
       },
       "required": [
         "id",
-        "productId",
-        "quantity",
         "saleDate",
-        "totalAmount"
+        "totalAmount",
+        "userId"
       ]
     },
-    "UserProfile": {
+    "SaleItem": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "UserProfile",
+      "title": "SaleItem",
       "type": "object",
-      "description": "Represents a user profile.",
+      "description": "Represents an item within a sale transaction.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the user profile."
+          "description": "Unique identifier for the SaleItem entity."
         },
-        "username": {
+        "saleId": {
           "type": "string",
-          "description": "Username of the user."
-        },
-        "email": {
-          "type": "string",
-          "description": "Email address of the user.",
-          "format": "email"
-        },
-        "fullName": {
-          "type": "string",
-          "description": "Full name of the user."
-        },
-        "role": {
-          "type": "string",
-          "description": "Role of the user (e.g., admin, manager, employee)."
-        }
-      },
-      "required": [
-        "id",
-        "username",
-        "email",
-        "fullName",
-        "role"
-      ]
-    },
-    "StockCount": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "StockCount",
-      "type": "object",
-      "description": "Represents a stock count event for a product.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the stock count event."
+          "description": "Reference to Sale. (Relationship: Sale 1:N SaleItem)"
         },
         "productId": {
           "type": "string",
-          "description": "Reference to Product. (Relationship: Product 1:N StockCount)"
+          "description": "Reference to Product. (Relationship: Product 1:N SaleItem)"
         },
-        "countDate": {
-          "type": "string",
-          "description": "Date and time of the stock count.",
-          "format": "date-time"
-        },
-        "countedQuantity": {
+        "quantity": {
           "type": "number",
-          "description": "The counted stock quantity."
+          "description": "The quantity of the product sold in this sale item."
         },
-        "expectedQuantity": {
+        "unitPrice": {
           "type": "number",
-          "description": "The expected stock quantity based on records."
-        },
-        "discrepancy": {
-          "type": "number",
-          "description": "The difference between counted and expected quantities."
-        },
-        "notes": {
-          "type": "string",
-          "description": "Any notes regarding the stock count."
+          "description": "The price of a single unit of the product at the time of the sale."
         }
       },
       "required": [
         "id",
+        "saleId",
         "productId",
-        "countDate",
-        "countedQuantity",
-        "expectedQuantity",
-        "discrepancy"
+        "quantity",
+        "unitPrice"
+      ]
+    },
+    "TillSession": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "TillSession",
+      "type": "object",
+      "description": "Represents a daily cash till session.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the TillSession entity."
+        },
+        "startDate": {
+          "type": "string",
+          "description": "The date and time when the session was started.",
+          "format": "date-time"
+        },
+        "openingBalance": {
+          "type": "number",
+          "description": "The starting cash float in the till."
+        },
+        "endDate": {
+          "type": "string",
+          "description": "The date and time when the session was closed.",
+          "format": "date-time"
+        },
+        "expectedCash": {
+          "type": "number",
+          "description": "The expected amount of cash in the till (opening balance + cash sales)."
+        },
+        "countedCash": {
+          "type": "number",
+          "description": "The actual amount of cash counted at the end of the session."
+        },
+        "difference": {
+          "type": "number",
+          "description": "The difference between expected and counted cash."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the till session.",
+          "enum": [
+            "Active",
+            "Closed"
+          ]
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the admin user who managed the session."
+        },
+        "userName": {
+          "type": "string",
+          "description": "The name of the admin user who managed the session."
+        }
+      },
+      "required": [
+        "id",
+        "startDate",
+        "openingBalance",
+        "status",
+        "userId",
+        "userName"
       ]
     }
   },
@@ -179,11 +280,11 @@
           "schema": {
             "$ref": "#/backend/entities/UserProfile"
           },
-          "description": "Stores user profile information. Uses path-based ownership for data privacy. Includes denormalized 'userId' for simplified security rules.",
+          "description": "Stores user profile information. Path-based ownership for simple security rules.",
           "params": [
             {
               "name": "userId",
-              "description": "The unique identifier of the user."
+              "description": "The unique identifier for the user.  This is the same as the Firebase Auth UID."
             }
           ]
         }
@@ -195,72 +296,92 @@
           "schema": {
             "$ref": "#/backend/entities/Product"
           },
-          "description": "Stores product catalog information. Includes fields like name, description, image URL, price, category, and stock level.",
+          "description": "Stores product information.  Root-level collection for global access.",
           "params": [
             {
               "name": "productId",
-              "description": "The unique identifier of the product."
+              "description": "The unique identifier for the product."
             }
           ]
         }
       },
       {
-        "path": "/products/{productId}/sales/{saleId}",
+        "path": "/categories/{categoryId}",
+        "definition": {
+          "entityName": "Category",
+          "schema": {
+            "$ref": "#/backend/entities/Category"
+          },
+          "description": "Stores category information. Root-level collection for global access.",
+          "params": [
+            {
+              "name": "categoryId",
+              "description": "The unique identifier for the category."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/sales/{saleId}",
         "definition": {
           "entityName": "Sale",
           "schema": {
             "$ref": "#/backend/entities/Sale"
           },
-          "description": "Stores sales transaction data related to a specific product. Includes fields like quantity, sale date, and total amount. Includes denormalized 'productId' for query optimization and security.",
-          "params": [
-            {
-              "name": "productId",
-              "description": "The unique identifier of the product."
-            },
-            {
-              "name": "saleId",
-              "description": "The unique identifier of the sale transaction."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/products/{productId}/stockCounts/{stockCountId}",
-        "definition": {
-          "entityName": "StockCount",
-          "schema": {
-            "$ref": "#/backend/entities/StockCount"
-          },
-          "description": "Stores stock count event data for a specific product. Includes fields like count date, counted quantity, expected quantity, discrepancy, and notes. Includes denormalized 'productId' for query optimization and security.",
-          "params": [
-            {
-              "name": "productId",
-              "description": "The unique identifier of the product."
-            },
-            {
-              "name": "stockCountId",
-              "description": "The unique identifier of the stock count event."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/roles_admin/{userId}",
-        "definition": {
-          "entityName": "roles_admin",
-          "schema": {
-            "$ref": "#/backend/entities/UserProfile"
-          },
-          "description": "Collection for storing admin role assignments. Document existence determines admin privileges.",
+          "description": "Stores sales data for each user. Path-based ownership.",
           "params": [
             {
               "name": "userId",
-              "description": "The unique identifier of the user."
+              "description": "The unique identifier for the user (owner of the sale)."
+            },
+            {
+              "name": "saleId",
+              "description": "The unique identifier for the sale."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/sales/{saleId}/saleItems/{saleItemId}",
+        "definition": {
+          "entityName": "SaleItem",
+          "schema": {
+            "$ref": "#/backend/entities/SaleItem"
+          },
+          "description": "Stores sale items for each sale. Includes denormalized 'userId' from the parent 'Sale' document for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user (owner of the sale)."
+            },
+            {
+              "name": "saleId",
+              "description": "The unique identifier for the sale."
+            },
+            {
+              "name": "saleItemId",
+              "description": "The unique identifier for the sale item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/tillSessions/{sessionId}",
+        "definition": {
+          "entityName": "TillSession",
+          "schema": {
+            "$ref": "#/backend/entities/TillSession"
+          },
+          "description": "Stores daily till management sessions. Root-level collection for admin access.",
+          "params": [
+            {
+              "name": "sessionId",
+              "description": "The unique identifier for the till session."
             }
           ]
         }
       }
     ],
-    "reasoning": "The Firestore data structure is designed to address the error related to network connectivity issues reported by Next.js, while also adhering to the principles of Authorization Independence, Structural Segregation, Access Modeling, and Data Clarity. Since the error is related to the app losing its connection to the backend, this is unrelated to Firestore structure. I will generate a structure based on the app's specifications, though. User profiles are stored separately from the products and sales data and are accessed based on the user's unique ID. Product and sales data are also segregated into their respective collections. Path-based ownership is used for user profiles. The structure promotes clear security rules and efficient data retrieval."
+    "reasoning": "The Firestore structure is designed to ensure Authorization Independence, support QAPs (queries are not filters), and maintain data clarity. User profiles are stored under `/users/{userId}` to establish clear ownership. Products and Categories are stored in root-level collections for global access and simplified querying. Sales data is stored under each user's document to maintain ownership. SaleItems are nested under the Sales, with denormalized `userId` from the `Sale` document, promoting authorization independence. This design avoids using `get()` calls in security rules by denormalizing ownership and membership data where needed.\n\nThis structure enables secure list operations by ensuring that each collection contains documents with a homogeneous security posture.  For example, only the user can access their own profile and sales.  Global collections like Products and Categories can have rules that allow read access to all authenticated users, or even public read access if desired.  Denormalization of the `userId` field in `saleItems` allows security rules to validate that only the owner of the sale can modify its items, without needing to perform expensive `get()` operations."
   }
 }

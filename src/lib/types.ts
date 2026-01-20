@@ -1,39 +1,37 @@
-
-import { type DocumentData, type DocumentReference, type Timestamp } from 'firebase/firestore';
-
 export type UserProfile = {
-  id: string;
-  name: string;
+  id: string; // Firestore Document ID
+  firstName: string;
+  lastName: string;
   email: string;
-  avatarUrl: string;
-  role: 'administration' | 'sales';
+  password?: string; // Storing password directly as requested
+  role: 'Administration' | 'Sales' | 'Super Administration';
+  pin?: string; // 6-digit PIN for admins to authorize actions
+  createdAt: string;
 };
 
 export type Product = {
   id:string;
-  name: string;
+  name:string;
   category: string;
   price: number;
-  stock: number; // Total number of individual items
+  stock: number;
   lowStockThreshold: number;
   description: string;
   imageUrl: string;
   imageHint: string;
-  barcodeEach: string;
+  barcode?: string;
   barcodePack?: string;
+  packSize?: number;
   barcodeCase?: string;
-  packSize: number; // e.g., 6
-  caseSize: number; // e.g., 24
+  caseSize?: number;
 };
 
 export type SaleItem = {
   productId: string;
-  productName: string;
+  name: string;
   quantity: number;
   price: number;
-  returnedQuantity?: number; // New field to track returned items
-  imageUrl?: string;
-  imageHint?: string;
+  returnedQuantity?: number; // New field to track returns
 };
 
 export type Sale = {
@@ -41,13 +39,22 @@ export type Sale = {
   date: string;
   total: number;
   customerName: string;
+  userId: string;
   items: SaleItem[];
   paymentMethod: 'Card' | 'Cash' | 'Transfer';
-  status: 'completed' | 'voided' | 'partially-returned';
-  salespersonId: string;
-  salespersonName: string;
-  amountPaid?: number;
-  change?: number;
+  subtotal: number;
+  tax: number;
+  amountPaid: number;
+  change: number;
+  salesperson: string;
+  status: 'Completed' | 'Voided' | 'Returned' | 'Partially Returned';
+  authorizations?: {
+    userId: string;
+    userName: string;
+    timestamp: string;
+    action: 'void' | 'return';
+    details: string;
+  }[];
 };
 
 export type CartItem = {
@@ -55,3 +62,17 @@ export type CartItem = {
   quantity: number;
 };
 
+export type TillSession = {
+    id: string;
+    startDate: string;
+    openingBalance: number;
+    endDate?: string;
+    expectedCash?: number;
+    countedCash?: number;
+    difference?: number;
+    status: 'Active' | 'Closed';
+    userId: string; // The admin who started/ended the session
+    userName: string;
+};
+
+    
