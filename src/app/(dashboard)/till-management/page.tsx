@@ -490,7 +490,7 @@ export default function TillManagementPage() {
                                         <div key={h.id} className="p-3 border rounded-lg">
                                             <div className="flex justify-between items-center mb-2">
                                                 <p className="font-semibold">{h.endDate ? format(new Date(h.endDate), 'PPP') : 'N/A'}</p>
-                                                <p className={`font-bold text-sm ${h.difference === 0 ? '' : h.difference > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                <p className={`font-bold text-sm ${(h.difference || 0) === 0 ? '' : (h.difference || 0) > 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                     {`R${(h.difference || 0).toFixed(2)}`}
                                                 </p>
                                             </div>
