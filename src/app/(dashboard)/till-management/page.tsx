@@ -267,7 +267,12 @@ export default function TillManagementPage() {
     
     const historyQuery = useMemoFirebase(() => {
         if (!user) return null;
-        return query(collection(firestore, 'tillSessions'), where('status', '==', 'Closed'), limit(10));
+        const startOfMonthDate = startOfMonth(new Date());
+        return query(
+          collection(firestore, 'tillSessions'), 
+          where('status', '==', 'Closed'),
+          where('endDate', '>=', startOfMonthDate.toISOString())
+        );
       }, [firestore, user]
     );
     const { data: historyUnsorted, isLoading: historyLoading, error: historyError } = useCollection<TillSession>(historyQuery);
@@ -278,7 +283,7 @@ export default function TillManagementPage() {
             const aDate = a.endDate ? new Date(a.endDate).getTime() : 0;
             const bDate = b.endDate ? new Date(b.endDate).getTime() : 0;
             return bDate - aDate;
-        }).slice(0, 5);
+        });
     }, [historyUnsorted]);
 
     const usersQuery = useMemoFirebase(() => {
@@ -486,32 +491,65 @@ export default function TillManagementPage() {
                     <div className="space-y-8">
                         <Card>
                             <CardHeader>
-                                <CardTitle>Recent Till History</CardTitle>
-                                <CardDescription>A log of the last 5 closed till sessions.</CardDescription>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Landmark className="h-5 w-5 text-primary" />
+                                    Till History - {format(new Date(), 'MMMM yyyy')}
+                                </CardTitle>
+                                <CardDescription>Complete log of all till sessions closed this month</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <div className="space-y-4">
+                                <div className="space-y-3">
                                     {historyLoading ? (
-                                        <div className="flex justify-center items-center h-24">
+                                        <div className="flex justify-center items-center h-32">
                                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                         </div>
                                     ) : historyError ? (
                                         <p className="text-sm text-destructive text-center py-8">Error loading history: {historyError.message}</p>
-                                    ) : history && history.length > 0 ? history.map(h => (
-                                        <div key={h.id} className="p-3 border rounded-lg">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <p className="font-semibold">{h.endDate ? format(new Date(h.endDate), 'PPP') : 'N/A'}</p>
-                                                <p className={`font-bold text-sm ${(h.difference || 0) === 0 ? '' : (h.difference || 0) > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                    {`R${(h.difference || 0).toFixed(2)}`}
-                                                </p>
-                                            </div>
-                                            <div className="text-xs text-muted-foreground space-y-1">
-                                                <p>Closed by: {h.userName}</p>
-                                                <p>Expected: {`R${(h.expectedCash || 0).toFixed(2)}`} | Counted: {`R${(h.countedCash || 0).toFixed(2)}`}</p>
+                                    ) : history && history.length > 0 ? (
+                                        <div className="border rounded-lg">
+                                            <div className="max-h-[500px] overflow-y-auto">
+                                                {history.map((h, idx) => (
+                                                    <div 
+                                                        key={h.id} 
+                                                        className={`p-4 border-b last:border-b-0 hover:bg-muted/50 transition-colors ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}
+                                                    >
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <p className="font-semibold text-sm">{h.endDate ? format(new Date(h.endDate), 'PPP') : 'N/A'}</p>
+                                                                    <p className="text-xs text-muted-foreground">{h.endDate ? format(new Date(h.endDate), 'p') : ''}</p>
+                                                                </div>
+                                                                <p className="text-sm text-muted-foreground">Operator: <span className="font-medium text-foreground">{h.userName}</span></p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className={`font-bold text-base ${(h.difference || 0) === 0 ? 'text-foreground' : (h.difference || 0) > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                                    {(h.difference || 0) === 0 ? '✓ Balanced' : (h.difference || 0) > 0 ? `+R${(h.difference || 0).toFixed(2)}` : `-R${Math.abs(h.difference || 0).toFixed(2)}`}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="grid grid-cols-3 gap-3 text-xs">
+                                                            <div className="bg-background rounded p-2">
+                                                                <p className="text-muted-foreground">Opening</p>
+                                                                <p className="font-mono font-semibold">R{(h.openingBalance || 0).toFixed(2)}</p>
+                                                            </div>
+                                                            <div className="bg-background rounded p-2">
+                                                                <p className="text-muted-foreground">Expected</p>
+                                                                <p className="font-mono font-semibold">R{(h.expectedCash || 0).toFixed(2)}</p>
+                                                            </div>
+                                                            <div className="bg-background rounded p-2">
+                                                                <p className="text-muted-foreground">Counted</p>
+                                                                <p className="font-mono font-semibold">R{(h.countedCash || 0).toFixed(2)}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
-                                    )) : (
-                                        <p className="text-sm text-muted-foreground text-center py-8">No closed sessions found.</p>
+                                    ) : (
+                                        <div className="text-center py-12">
+                                            <Landmark className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-50" />
+                                            <p className="text-sm text-muted-foreground">No closed sessions found this month</p>
+                                        </div>
                                     )}
                                 </div>
                             </CardContent>
