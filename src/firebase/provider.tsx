@@ -114,9 +114,9 @@ const useFirebaseInternal = () => {
     return context;
 }
 
-export const useAuth = (): Auth => useFirebaseInternal().auth;
-export const useFirestore = (): Firestore => useFirebaseInternal().firestore;
-export const useFirebaseApp = (): FirebaseApp => useFirebaseInternal().firebaseApp;
+export const useAuth = (): Auth => useFirebaseInternal().auth!;
+export const useFirestore = (): Firestore => useFirebaseInternal().firestore!;
+export const useFirebaseApp = (): FirebaseApp => useFirebaseInternal().firebaseApp!;
 
 type MemoFirebase <T> = T & {__memo?: boolean};
 
