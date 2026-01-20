@@ -53,8 +53,8 @@ service cloud.firestore {
     }
 
     function isClosingTillSession(data) {
-       return isString(data.endDate)
-        && data.status == 'Closed'
+       return data.status == 'Closed'
+        && isString(data.endDate)
         && isNumber(data.expectedCash)
         && isNumber(data.countedCash)
         && isNumber(data.difference);
@@ -102,7 +102,11 @@ service cloud.firestore {
     match /tillSessions/{sessionId} {
       allow read, list: if true;
       allow create: if isNewTillSession(request.resource.data);
-      allow update: if isClosingTillSession(request.resource.data);
+      allow update: if request.resource.data.status == 'Closed' 
+        && isString(request.resource.data.endDate)
+        && isNumber(request.resource.data.expectedCash)
+        && isNumber(request.resource.data.countedCash)
+        && isNumber(request.resource.data.difference);
       allow delete: if false;
     }
   }

@@ -267,10 +267,19 @@ export default function TillManagementPage() {
     
     const historyQuery = useMemoFirebase(() => {
         if (!user) return null;
-        return query(collection(firestore, 'tillSessions'), where('status', '==', 'Closed'), orderBy('endDate', 'desc'), limit(5));
+        return query(collection(firestore, 'tillSessions'), where('status', '==', 'Closed'), limit(10));
       }, [firestore, user]
     );
-    const { data: history, isLoading: historyLoading } = useCollection<TillSession>(historyQuery);
+    const { data: historyUnsorted, isLoading: historyLoading, error: historyError } = useCollection<TillSession>(historyQuery);
+    
+    const history = useMemo(() => {
+        if (!historyUnsorted) return null;
+        return [...historyUnsorted].sort((a, b) => {
+            const aDate = a.endDate ? new Date(a.endDate).getTime() : 0;
+            const bDate = b.endDate ? new Date(b.endDate).getTime() : 0;
+            return bDate - aDate;
+        }).slice(0, 5);
+    }, [historyUnsorted]);
 
     const usersQuery = useMemoFirebase(() => {
         if (!user) return null;
@@ -486,6 +495,8 @@ export default function TillManagementPage() {
                                         <div className="flex justify-center items-center h-24">
                                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                         </div>
+                                    ) : historyError ? (
+                                        <p className="text-sm text-destructive text-center py-8">Error loading history: {historyError.message}</p>
                                     ) : history && history.length > 0 ? history.map(h => (
                                         <div key={h.id} className="p-3 border rounded-lg">
                                             <div className="flex justify-between items-center mb-2">

@@ -30,12 +30,20 @@ export default function TillAuditsPage() {
   const sessionsQuery = useMemoFirebase(() => {
     return query(
       collection(firestore, 'tillSessions'),
-      where('status', '==', 'Closed'),
-      orderBy('endDate', 'desc')
+      where('status', '==', 'Closed')
     );
   }, [firestore]);
 
-  const { data: sessions, isLoading } = useCollection<TillSession>(sessionsQuery);
+  const { data: sessionsUnsorted, isLoading } = useCollection<TillSession>(sessionsQuery);
+  
+  const sessions = useMemo(() => {
+    if (!sessionsUnsorted) return null;
+    return [...sessionsUnsorted].sort((a, b) => {
+      const aDate = a.endDate ? new Date(a.endDate).getTime() : 0;
+      const bDate = b.endDate ? new Date(b.endDate).getTime() : 0;
+      return bDate - aDate;
+    });
+  }, [sessionsUnsorted]);
   
   const getDifferenceVariant = (difference: number = 0) => {
     if (difference < 0) return 'destructive';
