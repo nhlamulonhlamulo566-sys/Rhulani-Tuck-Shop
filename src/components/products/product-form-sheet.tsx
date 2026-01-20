@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -26,24 +26,22 @@ import {
   SheetFooter,
   SheetClose,
 } from '@/components/ui/sheet';
-import { Wand2, Loader2, Upload } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { generateDescriptionAction } from '@/app/(dashboard)/products/actions';
+import { Upload } from 'lucide-react';
 import type { Product } from '@/lib/types';
 
 const productFormSchema = z.object({
   name: z.string().min(2, 'Product name must be at least 2 characters.'),
+  barcode: z.string().optional(),
+  barcodePack: z.string().optional(),
+  packSize: z.coerce.number().int().min(0).optional(),
+  barcodeCase: z.string().optional(),
+  caseSize: z.coerce.number().int().min(0).optional(),
   category: z.string().min(2, 'Category must be at least 2 characters.'),
   price: z.coerce.number().positive('Price must be a positive number.'),
   stock: z.coerce.number().int().min(0, 'Stock cannot be negative.'),
   lowStockThreshold: z.coerce.number().int().min(0, 'Low stock threshold cannot be negative.'),
   description: z.string().min(10, 'Description must be at least 10 characters.'),
   imageUrl: z.string().optional().or(z.literal('')),
-  barcodeEach: z.string().min(1, 'Barcode (Each) is required.'),
-  barcodePack: z.string().optional(),
-  barcodeCase: z.string().optional(),
-  packSize: z.coerce.number().int().min(1),
-  caseSize: z.coerce.number().int().min(1),
 });
 
 type ProductFormValues = z.infer<typeof productFormSchema>;
@@ -52,23 +50,24 @@ interface ProductFormSheetProps {
   product?: Product;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (data: ProductFormValues) => void;
+  onSave: (data: ProductFormValues, currentProduct?: Product) => void;
 }
 
-export function ProductFormSheet({ product, open, onOpenChange, onSave }: ProductFormSheetProps) {
-  const { toast } = useToast();
-  const [isAiPending, startAiTransition] = useTransition();
-  const [imagePreview, setImagePreview] = useState<string | null>(product?.imageUrl || null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const form = useForm<ProductFormValues>({
-    resolver: zodResolver(productFormSchema),
-    defaultValues: product
+const getInitialValues = (product?: Product): ProductFormValues => {
+    return product
       ? {
-          ...product,
-          barcodeEach: product.barcodeEach || '',
+          name: product.name,
+          category: product.category,
+          price: product.price,
+          stock: product.stock,
+          lowStockThreshold: product.lowStockThreshold,
+          description: product.description,
+          imageUrl: product.imageUrl,
+          barcode: product.barcode || '',
           barcodePack: product.barcodePack || '',
+          packSize: product.packSize ?? 0,
           barcodeCase: product.barcodeCase || '',
+          caseSize: product.caseSize ?? 0,
         }
       : {
           name: '',
@@ -78,48 +77,31 @@ export function ProductFormSheet({ product, open, onOpenChange, onSave }: Produc
           lowStockThreshold: 10,
           description: '',
           imageUrl: '',
-          barcodeEach: '',
+          barcode: '',
           barcodePack: '',
+          packSize: 0,
           barcodeCase: '',
-          packSize: 6,
-          caseSize: 24,
-        },
+          caseSize: 0,
+        };
+}
+
+export function ProductFormSheet({ product, open, onOpenChange, onSave }: ProductFormSheetProps) {
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const form = useForm<ProductFormValues>({
+    resolver: zodResolver(productFormSchema),
+    defaultValues: getInitialValues(product),
   });
-
-  const handleGenerateDescription = () => {
-    const productName = form.getValues('name');
-    const productCategory = form.getValues('category');
-
-    if (!productName || !productCategory) {
-      toast({
-        variant: 'destructive',
-        title: 'Missing Information',
-        description: 'Please provide a product name and category to generate a description.',
-      });
-      return;
+  
+  useEffect(() => {
+    if (open) {
+      const initialValues = getInitialValues(product);
+      form.reset(initialValues);
+      setImagePreview(initialValues.imageUrl || null);
     }
+  }, [open, product, form]);
 
-    startAiTransition(async () => {
-      const { description: newDescription, error } = await generateDescriptionAction({
-        productName,
-        productCategory,
-      });
-
-      if (error) {
-        toast({
-          variant: 'destructive',
-          title: 'AI Generation Failed',
-          description: error,
-        });
-      } else if (newDescription) {
-        form.setValue('description', newDescription, { shouldValidate: true });
-        toast({
-          title: 'Description Generated',
-          description: 'The AI has successfully generated a product description.',
-        });
-      }
-    });
-  };
   
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -135,18 +117,16 @@ export function ProductFormSheet({ product, open, onOpenChange, onSave }: Produc
   };
 
   const onSubmit = (data: ProductFormValues) => {
-    onSave(data);
-    onOpenChange(false);
-    setImagePreview(null);
+    onSave(data, product);
+    handleOpenChange(false);
   };
   
-  // Reset image preview when sheet is closed without saving
   const handleOpenChange = (isOpen: boolean) => {
-    if (!isOpen) {
-      form.reset(product ? { ...product } : undefined);
-      setImagePreview(product?.imageUrl || null);
-    }
     onOpenChange(isOpen);
+    if (!isOpen) {
+      form.reset(getInitialValues(undefined));
+      setImagePreview(null);
+    }
   }
 
   return (
@@ -161,8 +141,8 @@ export function ProductFormSheet({ product, open, onOpenChange, onSave }: Produc
           </SheetDescription>
         </SheetHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 py-8">
-             <FormField
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-8">
+            <FormField
               control={form.control}
               name="name"
               render={({ field }) => (
@@ -175,75 +155,75 @@ export function ProductFormSheet({ product, open, onOpenChange, onSave }: Produc
                 </FormItem>
               )}
             />
-            <FormField
+             <FormField
               control={form.control}
-              name="barcodeEach"
+              name="barcode"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Barcode (Each)</FormLabel>
                   <FormControl>
-                    <Input placeholder="Barcode for a single item" {...field} />
+                    <Input placeholder="Barcode for a single item" {...field} value={field.value ?? ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <div className="flex space-x-4">
-               <FormField
+              <FormField
                 control={form.control}
                 name="barcodePack"
                 render={({ field }) => (
                   <FormItem className="flex-grow">
-                    <FormLabel>Barcode (Pack of {form.watch('packSize') || 1})</FormLabel>
+                    <FormLabel>Barcode (Pack)</FormLabel>
                     <FormControl>
-                      <Input placeholder="Barcode for a pack/shrink" {...field} />
+                      <Input placeholder="Barcode for a pack/shrink" {...field} value={field.value ?? ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-               <FormField
-                  control={form.control}
-                  name="packSize"
-                  render={({ field }) => (
-                    <FormItem className="w-1/4">
-                      <FormLabel>Pack Size</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <FormField
+                control={form.control}
+                name="packSize"
+                render={({ field }) => (
+                  <FormItem className="w-24">
+                    <FormLabel>Pack Size</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="0" {...field} value={field.value ?? 0} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
              <div className="flex space-x-4">
-                <FormField
-                  control={form.control}
-                  name="barcodeCase"
-                  render={({ field }) => (
-                    <FormItem className="flex-grow">
-                      <FormLabel>Barcode (Case of {form.watch('caseSize') || 1})</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Barcode for a full case" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="caseSize"
-                  render={({ field }) => (
-                    <FormItem className="w-1/4">
-                      <FormLabel>Case Size</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-             </div>
+              <FormField
+                control={form.control}
+                name="barcodeCase"
+                render={({ field }) => (
+                  <FormItem className="flex-grow">
+                    <FormLabel>Barcode (Case)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Barcode for a full case" {...field} value={field.value ?? ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="caseSize"
+                render={({ field }) => (
+                  <FormItem className="w-24">
+                    <FormLabel>Case Size</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="0" {...field} value={field.value ?? 0}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="category"
@@ -265,7 +245,7 @@ export function ProductFormSheet({ product, open, onOpenChange, onSave }: Produc
                   <FormItem className="w-1/2">
                     <FormLabel>Price (per Each)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" placeholder="9.99" {...field} />
+                      <Input type="number" placeholder="0" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -278,7 +258,7 @@ export function ProductFormSheet({ product, open, onOpenChange, onSave }: Produc
                   <FormItem className="w-1/2">
                     <FormLabel>Total Stock (Units)</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="100" {...field} />
+                      <Input type="number" placeholder="0" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -298,7 +278,7 @@ export function ProductFormSheet({ product, open, onOpenChange, onSave }: Produc
                   </FormItem>
                 )}
               />
-
+            
             <FormField
               control={form.control}
               name="description"
@@ -306,20 +286,6 @@ export function ProductFormSheet({ product, open, onOpenChange, onSave }: Produc
                 <FormItem>
                   <div className="flex items-center justify-between">
                     <FormLabel>Description</FormLabel>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleGenerateDescription}
-                      disabled={isAiPending}
-                    >
-                      {isAiPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Wand2 className="mr-2 h-4 w-4" />
-                      )}
-                      Generate with AI
-                    </Button>
                   </div>
                   <FormControl>
                     <Textarea

@@ -3,6 +3,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button';
 import type { Product } from '@/lib/types';
 import { PlusCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface ProductCardProps {
   product: Product;
@@ -10,8 +11,15 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, onAddToCart }: ProductCardProps) {
+  const isOutOfStock = product.stock <= 0;
+
   return (
-    <Card className="flex flex-col">
+    <Card className={`flex flex-col relative ${isOutOfStock ? 'opacity-50' : ''}`}>
+      {isOutOfStock && (
+        <Badge variant="destructive" className="absolute top-2 right-2 z-10">
+          Out of Stock
+        </Badge>
+      )}
       <CardHeader className="p-0">
         <Image
           src={product.imageUrl}
@@ -28,7 +36,7 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
       </CardContent>
       <CardFooter className="p-4 flex justify-between items-center">
         <p className="text-lg font-bold">R{product.price.toFixed(2)}</p>
-        <Button size="sm" onClick={() => onAddToCart(product)}>
+        <Button size="sm" onClick={() => onAddToCart(product)} disabled={isOutOfStock}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Add
         </Button>

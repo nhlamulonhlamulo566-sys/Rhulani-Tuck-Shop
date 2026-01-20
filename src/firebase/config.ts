@@ -1,8 +1,11 @@
+// This configuration is intended for development and environments where environment variables are not set.
+// In a production environment (like Firebase App Hosting), Firebase SDKs are automatically configured.
+// For other environments, use environment variables to secure your configuration.
+
 export const firebaseConfig = {
-  "projectId": "studio-42574481-4c342",
-  "appId": "1:113127004618:web:7d9409b0a4d71a11b7d733",
-  "apiKey": "AIzaSyBZ2DpYgQGmD9aQKqxUaWD9dva7CaluV0c",
-  "authDomain": "studio-42574481-4c342.firebaseapp.com",
-  "measurementId": "",
-  "messagingSenderId": "113127004618"
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
 };

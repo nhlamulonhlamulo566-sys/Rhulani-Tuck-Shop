@@ -1,74 +1,104 @@
-
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import PageHeader from '@/components/page-header';
 import { ProductCard } from '@/components/pos/product-card';
 import { PosCart } from '@/components/pos/pos-cart';
-import type { Product, CartItem, Sale } from '@/lib/types';
+import type { Product, CartItem, Sale, UserProfile, TillSession } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
-import { Barcode, Loader2 } from 'lucide-react';
+import { Barcode, Landmark, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Receipt, type ReceiptData } from '@/components/pos/receipt';
-import { useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, writeBatch, doc } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
-
+import { ReceiptModal } from '@/components/pos/receipt-modal';
+import { useFirestore, useCollection, useUser, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
+import { collection, doc, writeBatch, query, where, limit } from 'firebase/firestore';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function PosPage() {
   const firestore = useFirestore();
   const { user } = useUser();
-  
-  const productsQuery = useMemoFirebase(
-    firestore && user ? collection(firestore, 'products') : null,
-    'products',
-    [firestore, user]
-  );
 
-  const { data: products, isLoading: productsLoading, error: productsError } = useCollection<Product>(productsQuery) as any;
+  const activeSessionQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(
+      collection(firestore, 'tillSessions'),
+      where('status', '==', 'Active'),
+      where('userId', '==', user.id),
+      limit(1)
+    );
+  }, [firestore, user]);
+  const { data: activeSessions, isLoading: sessionLoading } = useCollection<TillSession>(activeSessionQuery);
+  const tillIsOpen = useMemo(() => !!activeSessions && activeSessions.length > 0, [activeSessions]);
+
+  const productsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return collection(firestore, 'products');
+  }, [firestore, user]);
+  const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
 
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [lastSale, setLastSale] = useState<ReceiptData | null>(null);
-  const receiptRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const [taxRate, setTaxRate] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Card'>('Cash');
+  const [amountPaid, setAmountPaid] = useState(0);
+  const [completedSale, setCompletedSale] = useState<Sale | null>(null);
 
-  const handleAddToCart = (product: Product, quantity = 1) => {
-    if (product.stock < quantity) {
-        toast({
-            variant: "destructive",
-            title: "Out of Stock",
-            description: `Not enough stock for ${product.name}. Only ${product.stock} available.`,
-        });
-        return;
+  useEffect(() => {
+    const savedTaxRate = localStorage.getItem('taxRate');
+    if (savedTaxRate) {
+      setTaxRate(parseFloat(savedTaxRate));
     }
+  }, []);
+
+  const handleTaxRateChange = (newRate: number) => {
+    const rate = isNaN(newRate) ? 0 : newRate;
+    setTaxRate(rate);
+    localStorage.setItem('taxRate', rate.toString());
+  };
+
+  const handleAddToCart = (product: Product) => {
+    if (product.stock <= 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Out of Stock',
+        description: `${product.name} is currently out of stock.`,
+      });
+      return;
+    }
+
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.product.id === product.id);
       if (existingItem) {
-         if ((existingItem.quantity + quantity) <= product.stock) {
-            return prevCart.map((item) =>
-              item.product.id === product.id ? { ...item, quantity: item.quantity + quantity } : item
-            );
-         } else {
-            toast({
-                variant: "destructive",
-                title: "Stock Limit Reached",
-                description: `You cannot add more of ${product.name}. Only ${product.stock} total available.`,
-            });
-            return prevCart;
-         }
+        if (existingItem.quantity >= product.stock) {
+          toast({
+            variant: "destructive",
+            title: "Stock Limit Reached",
+            description: `You cannot add more ${product.name} than is available in stock.`,
+          });
+          return prevCart;
+        }
+        return prevCart.map((item) =>
+          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        );
       }
-      return [...prevCart, { product, quantity: quantity }];
+      return [...prevCart, { product, quantity: 1 }];
     });
   };
   
   const handleUpdateQuantity = (productId: string, quantity: number) => {
+     const productInCart = cart.find(item => item.product.id === productId)?.product;
+    if (productInCart && quantity > productInCart.stock) {
+      toast({
+        variant: "destructive",
+        title: "Stock Limit Exceeded",
+        description: `Only ${productInCart.stock} units of ${productInCart.name} available.`,
+      });
+      return;
+    }
     setCart((prevCart) =>
       prevCart.map((item) =>
         item.product.id === productId ? { ...item, quantity: quantity } : item
-      )
+      ).filter(item => item.quantity > 0)
     );
   };
   
@@ -79,34 +109,12 @@ export default function PosPage() {
   const handleBarcodeScan = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       const barcode = event.currentTarget.value;
-      if (!products) return;
-
-      let productFound: Product | undefined;
-      let quantityToAdd = 1;
-
-      for (const p of products) {
-        if (p.barcodeEach && p.barcodeEach === barcode) {
-          productFound = p;
-          quantityToAdd = 1;
-          break;
-        }
-        if (p.barcodePack && p.barcodePack === barcode) {
-          productFound = p;
-          quantityToAdd = p.packSize;
-          break;
-        }
-        if (p.barcodeCase && p.barcodeCase === barcode) {
-          productFound = p;
-          quantityToAdd = p.caseSize;
-          break;
-        }
-      }
-
-      if (productFound) {
-        handleAddToCart(productFound, quantityToAdd);
+      const product = products?.find(p => p.barcode === barcode || p.barcodePack === barcode || p.barcodeCase === barcode);
+      if (product) {
+        handleAddToCart(product);
         toast({
             title: "Product Added",
-            description: `${productFound.name} (x${quantityToAdd}) has been added to the cart.`,
+            description: `${product.name} has been added to the cart.`,
         })
       } else {
         toast({
@@ -119,88 +127,126 @@ export default function PosPage() {
     }
   };
 
-  const finishCheckout = useCallback(() => {
-    setCart([]);
-    setLastSale(null);
-    toast({
-        title: "Checkout Successful",
-        description: "The sale has been recorded.",
-    });
-  }, [toast]);
+  const handleCompleteSale = async () => {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Authentication Error",
+        description: "You must be logged in to complete a sale.",
+      });
+      return;
+    }
+    
+    if (cart.length === 0) {
+       toast({
+        variant: "destructive",
+        title: "Cart is empty",
+        description: "Add products to the cart to complete a sale.",
+      });
+      return;
+    }
 
+    const subtotal = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
+    const tax = subtotal * (taxRate / 100);
+    const total = subtotal + tax;
 
-  const handleCheckout = async (saleDetails: Omit<ReceiptData, 'saleId' | 'date'>) => {
-    if (cart.length === 0 || !firestore || !user) return;
-
-    const batch = writeBatch(firestore);
-
-    // Update stock levels
-    cart.forEach(cartItem => {
-      const productRef = doc(firestore, 'products', cartItem.product.id);
-      const newStock = cartItem.product.stock - cartItem.quantity;
-      batch.update(productRef, { stock: newStock });
-    });
-
-    const saleId = `sale-${Date.now()}`;
-    const saleDate = new Date();
-
+    if (paymentMethod === 'Cash' && amountPaid < total) {
+      toast({
+        variant: "destructive",
+        title: "Insufficient Payment",
+        description: "The amount paid must be equal to or greater than the total amount.",
+      });
+      return;
+    }
+    
     const newSale: Omit<Sale, 'id'> = {
-      date: saleDate.toISOString(),
-      total: saleDetails.total,
+      date: new Date().toISOString(),
+      total: total,
       customerName: 'Walk-in Customer',
+      userId: user.id,
       items: cart.map(item => ({
         productId: item.product.id,
-        productName: item.product.name,
+        name: item.product.name,
         quantity: item.quantity,
         price: item.product.price,
-        imageUrl: item.product.imageUrl,
-        imageHint: item.product.imageHint,
       })),
-      paymentMethod: saleDetails.paymentMethod,
-      status: 'completed',
-      salespersonId: user.uid,
-      salespersonName: user.displayName || user.email || 'Unknown',
-      amountPaid: saleDetails.amountPaid,
-      change: saleDetails.change
-    };
-
-    const saleRef = doc(collection(firestore, 'sales'));
-    batch.set(saleRef, newSale);
+      paymentMethod: paymentMethod,
+      subtotal: subtotal,
+      tax: tax,
+      amountPaid: paymentMethod === 'Card' ? total : amountPaid,
+      change: paymentMethod === 'Cash' ? Math.max(0, amountPaid - total) : 0,
+      salesperson: `${user.firstName} ${user.lastName}` || 'Unknown',
+      status: 'Completed',
+    }
 
     try {
-        await batch.commit();
-        setLastSale({
-          ...saleDetails,
-          saleId: saleRef.id,
-          date: saleDate,
-          salespersonName: newSale.salespersonName,
-        });
-    } catch(e) {
-        console.error("Checkout failed:", e);
-        const permissionError = new FirestorePermissionError({
-            path: 'batch-write',
-            operation: 'create',
-        });
-        errorEmitter.emit('permission-error', permissionError);
-        toast({
-            variant: "destructive",
-            title: "Checkout Failed",
-            description: "There was an error processing the sale. Please check permissions and try again.",
-        });
-    }
-  };
+      const salesCollection = collection(firestore, `sales`);
+      const docRef = await addDocumentNonBlocking(salesCollection, newSale);
 
-  useEffect(() => {
-    if (lastSale) {
-        window.print();
-        finishCheckout();
+      if (!docRef) {
+        throw new Error("Failed to get document reference from sale creation.");
+      }
+
+      // Update stock levels
+      const batch = writeBatch(firestore);
+      cart.forEach(item => {
+        const productRef = doc(firestore, 'products', item.product.id);
+        const newStock = item.product.stock - item.quantity;
+        batch.update(productRef, { stock: newStock });
+      });
+      await batch.commit();
+      
+      setCompletedSale({ ...newSale, id: docRef.id });
+
+    } catch (error) {
+      console.error("Error completing sale:", error);
+      toast({
+        variant: "destructive",
+        title: "Sale Failed",
+        description: "Could not complete the transaction. Check security rules or network.",
+      });
     }
-  }, [lastSale, finishCheckout]);
+  }
+
+  const handleCloseReceipt = () => {
+    setCompletedSale(null);
+    setCart([]);
+    setAmountPaid(0);
+    setPaymentMethod('Cash');
+     toast({
+      title: "Sale Completed",
+      description: "The transaction has been successfully recorded.",
+    });
+  }
+
+  const isLoading = productsLoading || sessionLoading;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-5rem)]">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (user?.role === 'Sales' && !tillIsOpen) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center p-4">
+        <Alert className="max-w-md text-center">
+          <Landmark className="h-5 w-5" />
+          <AlertTitle className="font-bold">Till Closed</AlertTitle>
+          <AlertDescription>
+            Your till session has not been started for the day. Please contact an administrator to open your till.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
 
   return (
     <>
-      <div className="flex flex-col h-[calc(100vh-theme(spacing.24))]">
+      <div className="flex flex-col h-[calc(100vh-5rem)]">
         <PageHeader title="Point of Sale">
           <div className="relative w-full max-w-sm items-center">
               <Input
@@ -208,44 +254,53 @@ export default function PosPage() {
                 placeholder="Scan or enter barcode..."
                 onKeyDown={handleBarcodeScan}
                 className="pl-10"
+                disabled={productsLoading}
               />
               <span className="absolute inset-y-0 left-0 flex items-center justify-center pl-3">
                 <Barcode className="h-5 w-5 text-muted-foreground" />
               </span>
             </div>
         </PageHeader>
-        <div className="grid md:grid-cols-[2fr_1fr] gap-8 flex-1 overflow-hidden">
-          <ScrollArea className="h-full pr-4">
-            {productsLoading && (
-                <div className="flex items-center justify-center h-full">
-                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <div className="flex-grow overflow-hidden">
+          <div className="grid md:grid-cols-[2fr_1fr] gap-8 h-full">
+            <div className="h-full min-h-0">
+              <ScrollArea className="h-full">
+                {productsLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                    </div>
+                ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pr-4">
+                  {products?.map((product) => (
+                    <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
+                  ))}
                 </div>
-            )}
-            {!productsLoading && products && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {products.map((product) => (
-                  <ProductCard key={product.id} product={product} onAddToCart={() => handleAddToCart(product, 1)} />
-                ))}
-              </div>
-            )}
-            {!productsLoading && productsError && (
-              <div className="p-4 text-center text-red-600">Failed to load products: {productsError.message}</div>
-            )}
-          </ScrollArea>
-          <div className="hidden md:block h-full overflow-y-auto">
-            <PosCart 
-              items={cart} 
-              onUpdateQuantity={handleUpdateQuantity} 
-              onRemoveItem={handleRemoveItem} 
-              onCheckout={handleCheckout} 
-            />
+                )}
+              </ScrollArea>
+            </div>
+            <div className="hidden md:block h-full min-h-0">
+              <PosCart 
+                items={cart} 
+                taxRate={taxRate}
+                paymentMethod={paymentMethod}
+                amountPaid={amountPaid}
+                onUpdateQuantity={handleUpdateQuantity} 
+                onRemoveItem={handleRemoveItem}
+                onTaxRateChange={handleTaxRateChange}
+                onPaymentMethodChange={setPaymentMethod}
+                onAmountPaidChange={setAmountPaid}
+                onCheckout={handleCompleteSale}
+              />
+            </div>
           </div>
         </div>
       </div>
-      {lastSale && (
-        <div className="hidden print-receipt-container">
-          <Receipt ref={receiptRef} receiptData={lastSale} />
-        </div>
+      {completedSale && (
+        <ReceiptModal
+          sale={completedSale}
+          isOpen={!!completedSale}
+          onClose={handleCloseReceipt}
+        />
       )}
     </>
   );

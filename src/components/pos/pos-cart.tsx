@@ -1,200 +1,176 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import type { CartItem, Sale } from '@/lib/types';
-import { X, Plus, Minus, Percent } from 'lucide-react';
+import type { CartItem } from '@/lib/types';
+import { X, Plus, Minus } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ReceiptData } from './receipt';
 
 interface PosCartProps {
   items: CartItem[];
+  taxRate: number;
+  paymentMethod: 'Card' | 'Cash';
+  amountPaid: number;
   onUpdateQuantity: (productId: string, quantity: number) => void;
   onRemoveItem: (productId: string) => void;
-  onCheckout: (saleDetails: Omit<ReceiptData, 'saleId' | 'date'>) => void;
+  onTaxRateChange: (rate: number) => void;
+  onPaymentMethodChange: (method: 'Card' | 'Cash') => void;
+  onAmountPaidChange: (amount: number) => void;
+  onCheckout: () => void;
 }
 
-export function PosCart({ items, onUpdateQuantity, onRemoveItem, onCheckout }: PosCartProps) {
-  const [paymentMethod, setPaymentMethod] = useState<Sale['paymentMethod']>('Cash');
-  const [taxPercentage, setTaxPercentage] = useState<number>(0);
-  const [amountPaid, setAmountPaid] = useState<number>(0);
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
+export function PosCart({ 
+  items, 
+  taxRate, 
+  paymentMethod,
+  amountPaid,
+  onUpdateQuantity, 
+  onRemoveItem, 
+  onTaxRateChange,
+  onPaymentMethodChange,
+  onAmountPaidChange,
+  onCheckout,
+}: PosCartProps) {
   const subtotal = items.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
-  const taxAmount = subtotal * (taxPercentage / 100);
-  const total = subtotal + taxAmount;
+  const tax = subtotal * (taxRate / 100);
+  const total = subtotal + tax;
   const change = amountPaid > total ? amountPaid - total : 0;
 
-  const handleCheckout = () => {
-    onCheckout({
-      items,
-      subtotal,
-      taxAmount,
-      total,
-      amountPaid,
-      change,
-      paymentMethod,
-    });
-    setAmountPaid(0);
-  }
-
-  const handleAmountPaidChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value);
-    setAmountPaid(isNaN(value) ? 0 : value);
-  };
-  
-  const handleTaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value);
-    setTaxPercentage(isNaN(value) ? 0 : value);
-  };
-  
-  const isCheckoutDisabled = () => {
-    if (items.length === 0) return true;
-    if (paymentMethod === 'Cash') {
-      return amountPaid < total;
-    }
-    return false;
-  };
-  
-  // After checkout, items will be empty, resetting the view
-  useEffect(() => {
-    if (items.length === 0) {
-      setAmountPaid(0);
-      // Tax percentage persists
-    }
-  }, [items]);
-
-  if (!isClient) {
-    return null; // or a loading skeleton
-  }
+  const isCheckoutDisabled = items.length === 0 || (paymentMethod === 'Cash' && amountPaid < total);
 
   return (
     <Card className="flex flex-col h-full">
       <CardHeader>
         <CardTitle>Cart</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col overflow-hidden p-0">
-        <ScrollArea className="h-full">
+      <CardContent className="flex flex-col flex-grow overflow-hidden p-0">
+         <div className="grid grid-cols-12 gap-4 text-sm font-medium text-muted-foreground border-b pb-2 px-6 shrink-0">
+            <div className="col-span-6">Item</div>
+            <div className="col-span-3 text-center">Qty</div>
+            <div className="col-span-3 text-right">Price</div>
+          </div>
+        <ScrollArea className="flex-1 overflow-y-auto">
+            <div className="p-6 pt-2">
             {items.length === 0 ? (
-              <div className="flex items-center justify-center h-full px-6">
+            <div className="flex items-center justify-center h-full pt-10">
                 <p className="text-muted-foreground">Your cart is empty</p>
-              </div>
+            </div>
             ) : (
-              <div className="space-y-4 px-6">
-                <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-4 pb-2 border-b">
-                    <p className="text-sm font-medium text-muted-foreground">Product</p>
-                    <p className="text-sm font-medium text-muted-foreground text-center">Qty</p>
-                    <p className="text-sm font-medium text-muted-foreground text-right">Price</p>
-                    <div className="w-8"></div>
-                  </div>
+                <div className="divide-y">
                 {items.map((item) => (
-                  <div key={item.product.id} className="grid grid-cols-[2fr_1fr_1fr_auto] items-center gap-4">
-                    <div className="pr-2">
-                        <p className="font-medium text-sm truncate">{item.product.name}</p>
-                    </div>
-
-                    <div className="flex items-center gap-1 justify-center">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => onUpdateQuantity(item.product.id, Math.max(1, item.quantity - 1))}
-                        >
-                            <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-5 text-center text-sm">{item.quantity}</span>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => onUpdateQuantity(item.product.id, item.quantity + 1)}
-                        >
-                            <Plus className="h-3 w-3" />
-                        </Button>
-                    </div>
-                    <p className="text-sm font-medium text-right">
-                        R{(item.product.price * item.quantity).toFixed(2)}
-                    </p>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onRemoveItem(item.product.id)}>
-                        <X className="h-4 w-4 text-destructive" />
+                <div key={item.product.id} className="grid grid-cols-12 gap-4 items-center py-3">
+                    <div className="col-span-6 text-sm font-medium truncate">{item.product.name}</div>
+                    <div className="col-span-3 flex items-center justify-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => onUpdateQuantity(item.product.id, Math.max(1, item.quantity - 1))}
+                    >
+                        <Minus className="h-3 w-3" />
                     </Button>
-                  </div>
+                    <span className="w-4 text-center">{item.quantity}</span>
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => onUpdateQuantity(item.product.id, item.quantity + 1)}
+                    >
+                        <Plus className="h-3 w-3" />
+                    </Button>
+                    </div>
+                    <div className="col-span-3 text-sm font-medium text-right flex items-center justify-end gap-2">
+                        <span>R{(item.product.price * item.quantity).toFixed(2)}</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemoveItem(item.product.id)}>
+                            <X className="h-4 w-4 text-destructive" />
+                        </Button>
+                    </div>
+                </div>
                 ))}
-              </div>
+                </div>
             )}
+            </div>
         </ScrollArea>
       </CardContent>
-      <CardFooter className="flex-col !p-6 border-t">
-        <div className="w-full space-y-4 text-sm">
-          <div className="flex justify-between">
-            <span>Subtotal</span>
-            <span>R{subtotal.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <Label htmlFor="tax-percentage">Tax (%)</Label>
-            <div className="relative">
-              <Input 
-                id="tax-percentage"
-                type="number"
-                value={taxPercentage === 0 ? '' : taxPercentage}
-                onChange={handleTaxChange}
-                className="w-24 h-8 pl-3 pr-6 text-right"
-                placeholder="0"
-              />
-              <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <CardFooter className="flex-col !p-4 border-t space-y-3 shrink-0">
+        <div className="w-full space-y-2 text-sm">
+            <div className="flex justify-between items-center">
+                <span>Subtotal</span>
+                <span>R{subtotal.toFixed(2)}</span>
             </div>
-          </div>
-          <div className="flex justify-between text-muted-foreground">
-            <span>Tax Amount</span>
-            <span>R{taxAmount.toFixed(2)}</span>
-          </div>
-          <Separator className="my-2"/>
-          <RadioGroup defaultValue="Cash" value={paymentMethod} onValueChange={(value: Sale['paymentMethod']) => setPaymentMethod(value)} className="flex space-x-4">
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="Cash" id="cash" />
-              <Label htmlFor="cash">Cash</Label>
+            <div className="flex justify-between items-center">
+                <span>Tax (%)</span>
+                <div className="relative w-24">
+                    <Input
+                        type="number"
+                        className="h-8 w-full text-right pr-6"
+                        value={taxRate}
+                        onChange={(e) => onTaxRateChange(parseFloat(e.target.value) || 0)}
+                        placeholder="0"
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="Card" id="card" />
-              <Label htmlFor="card">Card</Label>
+            <div className="flex justify-between text-muted-foreground">
+                <span>Tax Amount</span>
+                <span>R{tax.toFixed(2)}</span>
             </div>
-          </RadioGroup>
-          <Separator className="my-2"/>
-          <div className="flex justify-between font-bold text-lg">
-            <span>Total</span>
-            <span>R{total.toFixed(2)}</span>
-          </div>
-           {paymentMethod === 'Cash' && (
-            <>
-              <div className="flex justify-between items-center">
-                <Label htmlFor="amount-paid">Amount Paid</Label>
-                <Input
-                  id="amount-paid"
-                  type="number"
-                  value={amountPaid === 0 ? '' : amountPaid}
-                  onChange={handleAmountPaidChange}
-                  className="w-24 h-8 text-right"
-                  placeholder="0.00"
-                />
-              </div>
-              <div className="flex justify-between text-muted-foreground">
-                <span>Change</span>
-                <span>R{change.toFixed(2)}</span>
-              </div>
-            </>
-           )}
         </div>
-        <Button className="w-full mt-4" disabled={isCheckoutDisabled()} onClick={handleCheckout}>
-          Checkout
+        
+        <RadioGroup value={paymentMethod} onValueChange={onPaymentMethodChange} className="flex justify-between items-center w-full pt-2">
+              <Label>Payment</Label>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="Cash" id="cash" />
+                  <Label htmlFor="cash">Cash</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="Card" id="card" />
+                  <Label htmlFor="card">Card</Label>
+                </div>
+              </div>
+        </RadioGroup>
+
+        <Separator className="my-2"/>
+
+        <div className="w-full space-y-2">
+            <div className="flex justify-between font-bold text-lg">
+                <span>Total</span>
+                <span>R{total.toFixed(2)}</span>
+            </div>
+            {paymentMethod === 'Cash' && (
+                <>
+                    <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Amount Paid</span>
+                        <Input
+                            type="number"
+                            className="h-8 w-28 text-right"
+                            value={amountPaid === 0 ? '' : amountPaid}
+                            onChange={(e) => onAmountPaidChange(parseFloat(e.target.value) || 0)}
+                            placeholder="0.00"
+                        />
+                    </div>
+                    {amountPaid >= total && (
+                        <div className="flex justify-between text-muted-foreground">
+                        <span>Change</span>
+                        <span>R{change.toFixed(2)}</span>
+                        </div>
+                    )}
+                </>
+            )}
+            {paymentMethod === 'Card' && (
+                <div className="flex justify-between items-center p-2 bg-blue-50 rounded-md">
+                    <span className="text-sm text-blue-700">Ready for Card Machine</span>
+                    <span className="text-sm font-semibold text-blue-700">R{total.toFixed(2)}</span>
+                </div>
+            )}
+        </div>
+        <Button className="w-full mt-4" disabled={isCheckoutDisabled} onClick={onCheckout}>
+          Complete Sale
         </Button>
       </CardFooter>
     </Card>
