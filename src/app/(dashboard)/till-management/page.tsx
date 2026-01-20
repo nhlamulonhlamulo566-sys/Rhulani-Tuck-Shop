@@ -267,11 +267,9 @@ export default function TillManagementPage() {
     
     const historyQuery = useMemoFirebase(() => {
         if (!user) return null;
-        const startOfMonthDate = startOfMonth(new Date());
         return query(
           collection(firestore, 'tillSessions'), 
-          where('status', '==', 'Closed'),
-          where('endDate', '>=', startOfMonthDate.toISOString())
+          where('status', '==', 'Closed')
         );
       }, [firestore, user]
     );
@@ -279,11 +277,15 @@ export default function TillManagementPage() {
     
     const history = useMemo(() => {
         if (!historyUnsorted) return null;
-        return [...historyUnsorted].sort((a, b) => {
-            const aDate = a.endDate ? new Date(a.endDate).getTime() : 0;
-            const bDate = b.endDate ? new Date(b.endDate).getTime() : 0;
-            return bDate - aDate;
-        });
+        const startOfMonthDate = startOfMonth(new Date());
+        // Filter by current month and sort by endDate descending
+        return [...historyUnsorted]
+            .filter(session => session.endDate && new Date(session.endDate) >= startOfMonthDate)
+            .sort((a, b) => {
+                const aDate = a.endDate ? new Date(a.endDate).getTime() : 0;
+                const bDate = b.endDate ? new Date(b.endDate).getTime() : 0;
+                return bDate - aDate;
+            });
     }, [historyUnsorted]);
 
     const usersQuery = useMemoFirebase(() => {
