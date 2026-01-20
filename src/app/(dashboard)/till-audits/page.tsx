@@ -101,7 +101,7 @@ export default function TillAuditsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Landmark className="h-5 w-5 text-primary" />
-            Net Sales for Today
+            Net Sales for Today - {format(new Date(), 'MMMM d, yyyy')}
           </CardTitle>
           <CardDescription>Daily sales summary by salesperson</CardDescription>
         </CardHeader>
@@ -111,17 +111,35 @@ export default function TillAuditsPage() {
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : Object.keys(salesBySalesperson).length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Object.entries(salesBySalesperson).map(([salesperson, data]) => (
-                <div key={salesperson} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">{salesperson}</p>
-                  <p className="text-2xl font-bold text-primary mb-2">R{data.netSales.toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground">{data.count} transaction{data.count !== 1 ? 's' : ''}</p>
+            <div className="border rounded-lg overflow-hidden">
+              <div className="max-h-[400px] overflow-y-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-0 divide-y sm:divide-y-0 sm:divide-x">
+                  {Object.entries(salesBySalesperson)
+                    .sort(([, a], [, b]) => b.netSales - a.netSales)
+                    .map(([salesperson, data]) => (
+                      <div 
+                        key={salesperson} 
+                        className="p-4 bg-background hover:bg-muted/50 transition-colors flex flex-col justify-between border-b sm:border-b-0 sm:border-r last:border-b-0 last:sm:border-r-0"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-foreground truncate mb-2">{salesperson}</p>
+                          <p className="text-3xl font-bold text-primary mb-1">R{data.netSales.toFixed(2)}</p>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                            {data.count} {data.count === 1 ? 'sale' : 'sales'}
+                          </span>
+                          <span className="text-xs text-muted-foreground font-medium">
+                            Avg: R{(data.netSales / data.count).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                 </div>
-              ))}
+              </div>
             </div>
           ) : (
-            <div className="text-center py-8">
+            <div className="text-center py-12">
               <Landmark className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-50" />
               <p className="text-sm text-muted-foreground">No sales completed today</p>
             </div>
@@ -131,53 +149,61 @@ export default function TillAuditsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Session History</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Landmark className="h-5 w-5 text-primary" />
+            Session History - All Till Sessions
+          </CardTitle>
           <CardDescription>A complete log of all closed till sessions and their cash-up results.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead className="text-right">Opening Float</TableHead>
-                  <TableHead className="text-right">Expected Cash</TableHead>
-                  <TableHead className="text-right">Counted Cash</TableHead>
-                  <TableHead className="text-right">Difference</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
+          <div className="border rounded-lg overflow-hidden">
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+              <Table>
+                <TableHeader className="bg-muted sticky top-0">
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
-                      <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
-                    </TableCell>
+                    <TableHead>Date</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead className="text-right">Opening Float</TableHead>
+                    <TableHead className="text-right">Expected Cash</TableHead>
+                    <TableHead className="text-right">Counted Cash</TableHead>
+                    <TableHead className="text-right">Difference</TableHead>
                   </TableRow>
-                ) : sessions && sessions.length > 0 ? (
-                  sessions.map((session) => (
-                    <TableRow key={session.id}>
-                      <TableCell className="font-medium">
-                        {session.endDate ? format(new Date(session.endDate), 'PP') : '-'}
-                      </TableCell>
-                      <TableCell>{session.userName}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(session.openingBalance)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(session.expectedCash)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(session.countedCash)}</TableCell>
-                      <TableCell className="text-right">
-                        <DifferenceBadge difference={session.difference} />
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-24 text-center">
+                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
                       </TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                      No closed sessions found.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                  ) : sessions && sessions.length > 0 ? (
+                    sessions.map((session, idx) => (
+                      <TableRow key={session.id} className={idx % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
+                        <TableCell className="font-medium">
+                          <div>
+                            <p>{session.endDate ? format(new Date(session.endDate), 'PP') : '-'}</p>
+                            <p className="text-xs text-muted-foreground">{session.endDate ? format(new Date(session.endDate), 'p') : ''}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">{session.userName}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">{formatCurrency(session.openingBalance)}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">{formatCurrency(session.expectedCash)}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">{formatCurrency(session.countedCash)}</TableCell>
+                        <TableCell className="text-right">
+                          <DifferenceBadge difference={session.difference} />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                        No closed sessions found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </CardContent>
       </Card>
