@@ -73,22 +73,38 @@ export default function TillAuditsPage() {
     return summary;
   }, [todaySales]);
   
+  const getExpectedCashWithTodaySales = (session: TillSession): number => {
+    // Calculate expected cash as: opening balance + net sales for today for this salesperson
+    const todayNetSales = salesBySalesperson[session.userName]?.netSales || 0;
+    return (session.openingBalance || 0) + todayNetSales;
+  };
+
   const getDifferenceVariant = (difference: number = 0) => {
     if (difference < 0) return 'destructive';
     if (difference > 0) return 'default';
     return 'secondary';
   }
   
-  const DifferenceBadge = ({ difference = 0 }: { difference: number | undefined }) => {
+  const DifferenceBadge = ({ difference = 0, expectedCash = 0, countedCash = 0 }: { difference: number | undefined; expectedCash?: number; countedCash?: number }) => {
     if (difference === undefined) return null;
     
+    const absoDifference = Math.abs(difference || 0);
     const variant = getDifferenceVariant(difference);
     const Icon = difference < 0 ? TrendingDown : difference > 0 ? TrendingUp : Minus;
+    
+    let message = '';
+    if (difference > 0) {
+      message = `Over by ${formatCurrency(difference)}`;
+    } else if (difference < 0) {
+      message = `Short by ${formatCurrency(absoDifference)}`;
+    } else {
+      message = 'Balanced ✓';
+    }
 
     return (
-        <Badge variant={variant} className="flex items-center gap-1">
-            <Icon className="h-3 w-3" />
-            <span>{formatCurrency(difference)}</span>
+        <Badge variant={variant} className="flex items-center gap-2 px-3 py-1.5">
+            <Icon className="h-4 w-4" />
+            <span className="font-medium text-sm">{message}</span>
         </Badge>
     );
   }
@@ -177,23 +193,34 @@ export default function TillAuditsPage() {
                       </TableCell>
                     </TableRow>
                   ) : sessions && sessions.length > 0 ? (
-                    sessions.map((session, idx) => (
-                      <TableRow key={session.id} className={idx % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
-                        <TableCell className="font-medium">
-                          <div>
-                            <p>{session.endDate ? format(new Date(session.endDate), 'PP') : '-'}</p>
-                            <p className="text-xs text-muted-foreground">{session.endDate ? format(new Date(session.endDate), 'p') : ''}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-medium">{session.userName}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">{formatCurrency(session.openingBalance)}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">{formatCurrency(session.expectedCash)}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">{formatCurrency(session.countedCash)}</TableCell>
-                        <TableCell className="text-right">
-                          <DifferenceBadge difference={session.difference} />
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    sessions.map((session, idx) => {
+                      const calculatedExpectedCash = getExpectedCashWithTodaySales(session);
+                      const calculatedDifference = (session.countedCash || 0) - calculatedExpectedCash;
+                      return (
+                        <TableRow key={session.id} className={idx % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
+                          <TableCell className="font-medium">
+                            <div>
+                              <p>{session.endDate ? format(new Date(session.endDate), 'PP') : '-'}</p>
+                              <p className="text-xs text-muted-foreground">{session.endDate ? format(new Date(session.endDate), 'p') : ''}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-medium">{session.userName}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{formatCurrency(session.openingBalance)}</TableCell>
+                          <TableCell>
+                            <div className="text-right">
+                              <p className="font-mono text-sm">{formatCurrency(calculatedExpectedCash)}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatCurrency(session.openingBalance)} + {formatCurrency(salesBySalesperson[session.userName]?.netSales || 0)}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">{formatCurrency(session.countedCash)}</TableCell>
+                          <TableCell className="text-right">
+                            <DifferenceBadge difference={calculatedDifference} expectedCash={calculatedExpectedCash} countedCash={session.countedCash} />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   ) : (
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
