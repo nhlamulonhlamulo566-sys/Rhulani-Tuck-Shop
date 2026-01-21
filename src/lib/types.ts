@@ -48,7 +48,7 @@ export type Sale = {
   change?: number; // Optional for withdrawal
   salesperson: string;
   status: 'Completed' | 'Voided' | 'Returned' | 'Partially Returned' | 'Withdrawal';
-  transactionType?: 'sale' | 'withdrawal'; // To distinguish between sales and withdrawals
+  transactionType?: 'sale' | 'withdrawal' | 'airtime' | 'electricity' | 'voucher'; // To distinguish between sales and withdrawals and purchases
   withdrawalReason?: string; // Reason for withdrawal
   cardTransactionId?: string; // Card payment transaction ID from payment gateway
   authorizations?: {
