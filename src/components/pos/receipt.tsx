@@ -33,7 +33,7 @@ export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(({ sale },
           <span className="w-8 text-center">QTY</span>
           <span className="w-16 text-right">PRICE</span>
         </div>
-        {sale.items.map((item, index) => (
+        {(sale.items || []).map((item, index) => (
             <div key={index} className="flex">
               <span className="flex-grow pr-2">{item.name}</span>
               <span className="w-8 text-center">{item.quantity}</span>
@@ -47,11 +47,11 @@ export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(({ sale },
               <div className="w-40">
                   <div className="flex justify-between">
                       <span>Subtotal:</span>
-                      <span>{formatCurrency(sale.subtotal)}</span>
+                      <span>{formatCurrency(sale.subtotal || 0)}</span>
                   </div>
                   <div className="flex justify-between">
                       <span>Tax:</span>
-                      <span>{formatCurrency(sale.tax)}</span>
+                      <span>{formatCurrency(sale.tax || 0)}</span>
                   </div>
                   <div className="flex justify-between font-bold">
                       <span>Total:</span>
@@ -71,11 +71,11 @@ export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(({ sale },
               <>
               <div className="flex justify-between">
                   <span>Amount Paid:</span>
-                  <span>{formatCurrency(sale.amountPaid)}</span>
+                  <span>{formatCurrency(sale.amountPaid || 0)}</span>
               </div>
               <div className="flex justify-between">
                   <span>Change:</span>
-                  <span>{formatCurrency(sale.change)}</span>
+                  <span>{formatCurrency(sale.change || 0)}</span>
               </div>
               </>
           )}

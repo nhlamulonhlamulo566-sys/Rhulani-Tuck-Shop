@@ -51,12 +51,14 @@ export default function ReorderHubPage() {
     const validSales = sales.filter(s => s.status === 'Completed' || s.status === 'Partially Returned');
 
     validSales.forEach(sale => {
-      sale.items.forEach(item => {
-        const soldQty = item.quantity - (item.returnedQuantity || 0);
-        if (soldQty > 0) {
-          salesVolumeMap.set(item.productId, (salesVolumeMap.get(item.productId) || 0) + soldQty);
-        }
-      });
+      if (sale.items) {
+        sale.items.forEach(item => {
+          const soldQty = item.quantity - (item.returnedQuantity || 0);
+          if (soldQty > 0) {
+            salesVolumeMap.set(item.productId, (salesVolumeMap.get(item.productId) || 0) + soldQty);
+          }
+        });
+      }
     });
 
     // Filter for low stock products and calculate priority score

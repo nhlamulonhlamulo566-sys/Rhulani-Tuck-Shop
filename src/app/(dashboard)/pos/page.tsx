@@ -9,6 +9,15 @@ import type { Product, CartItem, Sale, UserProfile, TillSession } from '@/lib/ty
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Barcode, Landmark, Loader2, RotateCcw, Trash2, Wallet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ReceiptModal } from '@/components/pos/receipt-modal';
@@ -47,6 +56,10 @@ export default function PosPage() {
   const [pinAuthOpen, setPinAuthOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<'return' | 'void' | 'withdrawal' | null>(null);
   const [authorizingAdmin, setAuthorizingAdmin] = useState<UserProfile | null>(null);
+  const [withdrawalDialogOpen, setWithdrawalDialogOpen] = useState(false);
+  const [withdrawalAmount, setWithdrawalAmount] = useState('');
+  const [withdrawalReason, setWithdrawalReason] = useState('');
+  const [isProcessingWithdrawal, setIsProcessingWithdrawal] = useState(false);
 
   useEffect(() => {
     const savedTaxRate = localStorage.getItem('taxRate');
@@ -225,8 +238,70 @@ export default function PosPage() {
   }
 
   const handleRequestAction = (action: 'return' | 'void' | 'withdrawal') => {
-    setPendingAction(action);
-    setPinAuthOpen(true);
+    if (action === 'withdrawal') {
+      setWithdrawalDialogOpen(true);
+    } else {
+      setPendingAction(action);
+      setPinAuthOpen(true);
+    }
+  };
+
+  const handleProcessWithdrawal = async () => {
+    if (!user) {
+      toast({
+        variant: 'destructive',
+        title: 'User Not Found',
+        description: 'You must be logged in to process a withdrawal.',
+      });
+      return;
+    }
+
+    if (!withdrawalAmount || isNaN(parseFloat(withdrawalAmount)) || parseFloat(withdrawalAmount) <= 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Amount',
+        description: 'Please enter a valid withdrawal amount.',
+      });
+      return;
+    }
+
+    const amount = parseFloat(withdrawalAmount);
+    setIsProcessingWithdrawal(true);
+
+    try {
+      const withdrawalTransaction: Omit<Sale, 'id'> = {
+        date: new Date().toISOString(),
+        total: -amount, // Negative to indicate withdrawal
+        customerName: 'Cash Withdrawal',
+        userId: user.id,
+        salesperson: `${user.firstName} ${user.lastName}` || 'Unknown',
+        status: 'Withdrawal',
+        transactionType: 'withdrawal',
+        withdrawalReason: withdrawalReason || 'Cash withdrawal',
+      };
+
+      const salesCollection = collection(firestore, 'sales');
+      await addDocumentNonBlocking(salesCollection, withdrawalTransaction);
+
+      toast({
+        title: 'Withdrawal Processed',
+        description: `R${amount.toFixed(2)} has been withdrawn and recorded.`,
+      });
+
+      // Reset form
+      setWithdrawalAmount('');
+      setWithdrawalReason('');
+      setWithdrawalDialogOpen(false);
+    } catch (error) {
+      console.error('Withdrawal error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Withdrawal Failed',
+        description: 'Could not process withdrawal. Please try again.',
+      });
+    } finally {
+      setIsProcessingWithdrawal(false);
+    }
   };
 
   const handlePinSuccess = (admin: UserProfile) => {
@@ -381,6 +456,78 @@ export default function PosPage() {
         title={`${pendingAction?.charAt(0).toUpperCase()}${pendingAction?.slice(1)} - Administrator PIN Required`}
         description={`Enter your 6-digit administrator PIN to proceed with ${pendingAction}.`}
       />
+      <Dialog open={withdrawalDialogOpen} onOpenChange={setWithdrawalDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-amber-600" />
+              Cash Withdrawal
+            </DialogTitle>
+            <DialogDescription>
+              Enter the withdrawal amount and optional reason for the cash being withdrawn.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                Withdrawal Amount (R) <span className="text-red-500">*</span>
+              </label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={withdrawalAmount}
+                onChange={(e) => setWithdrawalAmount(e.target.value)}
+                min="0"
+                step="0.01"
+                disabled={isProcessingWithdrawal}
+                className="text-lg font-semibold"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                Reason / Description
+              </label>
+              <Textarea
+                placeholder="e.g., Change float, Banking, Staff payment"
+                value={withdrawalReason}
+                onChange={(e) => setWithdrawalReason(e.target.value)}
+                disabled={isProcessingWithdrawal}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setWithdrawalDialogOpen(false);
+                setWithdrawalAmount('');
+                setWithdrawalReason('');
+              }}
+              disabled={isProcessingWithdrawal}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleProcessWithdrawal}
+              disabled={isProcessingWithdrawal || !withdrawalAmount}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {isProcessingWithdrawal ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Wallet className="mr-2 h-4 w-4" />
+                  Withdraw Cash
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

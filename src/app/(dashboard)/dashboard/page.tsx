@@ -21,7 +21,7 @@ const getAdjustedSaleTotal = (sale: Sale) => {
     return acc + (returnedQty * item.price);
   }, 0);
   
-  const taxRate = (sale.subtotal && sale.subtotal > 0) ? sale.tax / sale.subtotal : 0;
+  const taxRate = (sale.subtotal && sale.subtotal > 0 && sale.tax) ? sale.tax / sale.subtotal : 0;
   const returnedTax = isNaN(taxRate) ? 0 : returnedValue * taxRate;
 
   return originalTotal - (returnedValue + returnedTax);

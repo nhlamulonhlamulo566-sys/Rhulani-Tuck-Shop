@@ -44,7 +44,7 @@ export function ReturnItemsDialog({ sale, isOpen, onClose, onConfirm }: ReturnIt
   }, [isOpen, sale]);
 
   const handleQuantityChange = (productId: string, quantity: number) => {
-    const originalItem = sale.items.find(item => item.productId === productId);
+    const originalItem = (sale.items || []).find(item => item.productId === productId);
     if (!originalItem) return;
 
     const previouslyReturned = originalItem.returnedQuantity || 0;
@@ -60,7 +60,7 @@ export function ReturnItemsDialog({ sale, isOpen, onClose, onConfirm }: ReturnIt
   };
   
   const handleCheckedChange = (checked: boolean, productId: string) => {
-    const originalItem = sale.items.find(item => item.productId === productId);
+    const originalItem = (sale.items || []).find(item => item.productId === productId);
     if (!originalItem) return;
 
     const previouslyReturned = originalItem.returnedQuantity || 0;
@@ -103,7 +103,7 @@ export function ReturnItemsDialog({ sale, isOpen, onClose, onConfirm }: ReturnIt
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            {sale.items.map(item => {
+            {(sale.items || []).map(item => {
               const previouslyReturned = item.returnedQuantity || 0;
               const maxReturnable = item.quantity - previouslyReturned;
               const isFullyReturned = maxReturnable <= 0;

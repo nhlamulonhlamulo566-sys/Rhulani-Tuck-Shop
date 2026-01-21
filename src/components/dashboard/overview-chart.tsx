@@ -24,7 +24,7 @@ const getAdjustedSaleTotal = (sale: Sale) => {
   
   // Also need to adjust for tax if it was applied.
   // Assuming tax is proportional, we subtract the proportional tax on the returned value.
-  const taxRate = (sale.subtotal && sale.subtotal > 0) ? sale.tax / sale.subtotal : 0;
+  const taxRate = (sale.subtotal && sale.subtotal > 0 && sale.tax) ? sale.tax / sale.subtotal : 0;
   const returnedTax = isNaN(taxRate) ? 0 : returnedValue * taxRate;
 
   return originalTotal - (returnedValue + returnedTax);

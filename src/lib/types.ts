@@ -40,19 +40,21 @@ export type Sale = {
   total: number;
   customerName: string;
   userId: string;
-  items: SaleItem[];
-  paymentMethod: 'Card' | 'Cash' | 'Transfer';
-  subtotal: number;
-  tax: number;
-  amountPaid: number;
-  change: number;
+  items?: SaleItem[]; // Optional for withdrawal transactions
+  paymentMethod?: 'Card' | 'Cash' | 'Transfer'; // Optional for withdrawal
+  subtotal?: number; // Optional for withdrawal
+  tax?: number; // Optional for withdrawal
+  amountPaid?: number; // Optional for withdrawal
+  change?: number; // Optional for withdrawal
   salesperson: string;
-  status: 'Completed' | 'Voided' | 'Returned' | 'Partially Returned';
+  status: 'Completed' | 'Voided' | 'Returned' | 'Partially Returned' | 'Withdrawal';
+  transactionType?: 'sale' | 'withdrawal'; // To distinguish between sales and withdrawals
+  withdrawalReason?: string; // Reason for withdrawal
   authorizations?: {
     userId: string;
     userName: string;
     timestamp: string;
-    action: 'void' | 'return';
+    action: 'void' | 'return' | 'withdrawal';
     details: string;
   }[];
 };

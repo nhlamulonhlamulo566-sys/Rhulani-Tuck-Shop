@@ -42,7 +42,7 @@ function SaleRow({ sale, onSelect }: { sale: Sale; onSelect: (sale: Sale) => voi
       <TableCell>
         {getStatusBadge(sale.status)}
       </TableCell>
-      <TableCell>{sale.items.reduce((sum, item) => sum + item.quantity, 0)}</TableCell>
+      <TableCell>{(sale.items || []).reduce((sum, item) => sum + item.quantity, 0)}</TableCell>
       <TableCell className="text-right">R{sale.total.toFixed(2)}</TableCell>
       <TableCell className="text-right">
         <Button variant="outline" size="sm" onClick={() => onSelect(sale)}>

@@ -144,18 +144,20 @@ export default function CashUpPage() {
           }
           
           if (sale.status === 'Partially Returned' || sale.status === 'Returned') {
-            const returnedValue = sale.items.reduce((sum, item) => {
-              const returnedQty = item.returnedQuantity || 0;
-              return sum + (returnedQty * item.price);
-            }, 0);
+            if (sale.items) {
+              const returnedValue = sale.items.reduce((sum, item) => {
+                const returnedQty = item.returnedQuantity || 0;
+                return sum + (returnedQty * item.price);
+              }, 0);
+              
+              const taxRate = (sale.subtotal && sale.subtotal > 0 && sale.tax) ? sale.tax / sale.subtotal : 0;
+              const returnedTax = returnedValue * taxRate;
+              
+              const totalReturnedValue = returnedValue + (isNaN(returnedTax) ? 0 : returnedTax);
             
-            const taxRate = (sale.subtotal && sale.subtotal > 0) ? sale.tax / sale.subtotal : 0;
-            const returnedTax = returnedValue * taxRate;
-            
-            const totalReturnedValue = returnedValue + (isNaN(returnedTax) ? 0 : returnedTax);
-            
-            acc[salespersonName][period].returns += totalReturnedValue;
-            acc[salespersonName][period].total -= totalReturnedValue;
+              acc[salespersonName][period].returns += totalReturnedValue;
+              acc[salespersonName][period].total -= totalReturnedValue;
+            }
           }
         }
       };
