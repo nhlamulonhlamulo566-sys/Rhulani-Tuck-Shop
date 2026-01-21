@@ -26,6 +26,8 @@ function SaleRow({ sale, onSelect }: { sale: Sale; onSelect: (sale: Sale) => voi
       case 'Voided':
       case 'Returned':
         return <Badge variant="destructive">{status}</Badge>;
+      case 'Withdrawal':
+        return <Badge variant="secondary" className="bg-amber-100 text-amber-900">Withdrawal</Badge>;
       case 'Partially Returned':
         return <Badge variant="secondary">{status}</Badge>;
       case 'Completed':

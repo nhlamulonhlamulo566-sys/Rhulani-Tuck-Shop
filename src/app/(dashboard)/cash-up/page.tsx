@@ -5,7 +5,7 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 import type { Sale, UserProfile } from '@/lib/types';
 import { startOfToday, startOfWeek, startOfMonth, endOfToday, endOfWeek, endOfMonth, isWithinInterval } from 'date-fns';
-import { Loader2, User, Ban, Undo2, Users } from 'lucide-react';
+import { Loader2, User, Ban, Undo2, Users, Wallet } from 'lucide-react';
 import PageHeader from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -19,6 +19,7 @@ import {
 interface PaymentStats {
   cash: number;
   card: number;
+  withdrawals: number;
   voids: number;
   returns: number;
   total: number;
@@ -32,7 +33,7 @@ interface PeriodTotals {
 
 type SalespersonTotals = Record<string, PeriodTotals>;
 
-const emptyStats: PaymentStats = { cash: 0, card: 0, voids: 0, returns: 0, total: 0 };
+const emptyStats: PaymentStats = { cash: 0, card: 0, withdrawals: 0, voids: 0, returns: 0, total: 0 };
 const emptyPeriodTotals: PeriodTotals = {
   today: { ...emptyStats },
   thisWeek: { ...emptyStats },
@@ -65,6 +66,21 @@ const TotalsCard = ({ title, stats }: { title: string; stats: PaymentStats }) =>
   </Card>
 );
 
+const WithdrawalCard = ({ amount }: { amount: number }) => (
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2">
+        <Wallet className="h-5 w-5 text-amber-600" />
+        <span>Cash Withdrawals</span>
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      <p className="text-2xl font-bold text-amber-600">R{amount.toFixed(2)}</p>
+      <p className="text-xs text-muted-foreground">Total withdrawn this period</p>
+    </CardContent>
+  </Card>
+);
+
 const AdjustmentCard = ({ title, amount, icon: Icon }: { title: string; amount: number; icon: React.ElementType }) => (
   <Card>
     <CardHeader>
@@ -83,8 +99,9 @@ const AdjustmentCard = ({ title, amount, icon: Icon }: { title: string; amount: 
 const PeriodSection = ({ title, stats }: { title: string; stats: PaymentStats }) => (
     <div>
         <h3 className="mb-4 text-xl font-semibold tracking-tight">{title}</h3>
-        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-4">
           <TotalsCard title="Net Sales" stats={stats} />
+          <WithdrawalCard amount={stats.withdrawals} />
           <AdjustmentCard title="Voids" amount={stats.voids} icon={Ban} />
           <AdjustmentCard title="Returns" amount={stats.returns} icon={Undo2} />
         </div>
@@ -134,6 +151,10 @@ export default function CashUpPage() {
             return;
           }
 
+          if (sale.status === 'Withdrawal' || sale.transactionType === 'withdrawal') {
+            acc[salespersonName][period].withdrawals += Math.abs(sale.total);
+          }
+
           if (sale.status === 'Completed' || sale.status === 'Partially Returned') {
             if (sale.paymentMethod === 'Cash') {
                 acc[salespersonName][period].cash += sale.total;
@@ -178,6 +199,7 @@ export default function CashUpPage() {
             const p = period as keyof PeriodTotals;
             totals[p].cash += personTotals[p].cash;
             totals[p].card += personTotals[p].card;
+            totals[p].withdrawals += personTotals[p].withdrawals;
             totals[p].voids += personTotals[p].voids;
             totals[p].returns += personTotals[p].returns;
             totals[p].total += personTotals[p].total;
