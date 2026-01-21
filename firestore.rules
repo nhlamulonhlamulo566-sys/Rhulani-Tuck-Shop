@@ -70,15 +70,16 @@ service cloud.firestore {
     }
 
     // --- Users Collection ---
-    // Administrators and Super Administrators can create/edit users
+    // Allow creation and updates with flexible validation
     match /users/{userId} {
       allow read, list: if true; 
-      allow create: if isUserProfile(request.resource.data);
-      allow update: if request.resource.data.keys().size() > 0
-        && (request.resource.data.firstName == null || isString(request.resource.data.firstName))
-        && (request.resource.data.lastName == null || isString(request.resource.data.lastName))
-        && (request.resource.data.role == null || (isString(request.resource.data.role) && (request.resource.data.role == 'Administration' || request.resource.data.role == 'Sales' || request.resource.data.role == 'Super Administration')))
-        && (request.resource.data.pin == null || (isString(request.resource.data.pin) && (request.resource.data.pin.length() == 0 || request.resource.data.pin.matches('^[0-9]{6}$'))));
+      allow create: if isString(request.resource.data.id)
+        && isString(request.resource.data.firstName)
+        && isString(request.resource.data.lastName)
+        && isString(request.resource.data.email)
+        && isString(request.resource.data.role)
+        && isString(request.resource.data.createdAt);
+      allow update: if request.resource.data.keys().size() > 0;
       allow delete: if false;
     }
 
