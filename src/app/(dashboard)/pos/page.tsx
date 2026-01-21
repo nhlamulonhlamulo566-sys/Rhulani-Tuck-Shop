@@ -17,12 +17,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Barcode, Landmark, Loader2, Wallet } from 'lucide-react';
+import { Barcode, Landmark, Loader2, Wallet, CreditCard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ReceiptModal } from '@/components/pos/receipt-modal';
 import { useFirestore, useCollection, useUser, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
 import { collection, doc, writeBatch, query, where, limit } from 'firebase/firestore';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { processCardPayment, isValidCardAmount } from '@/lib/card-payment';
 
 export default function PosPage() {
   const firestore = useFirestore();
@@ -57,6 +58,8 @@ export default function PosPage() {
   const [withdrawalDialogOpen, setWithdrawalDialogOpen] = useState(false);
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
   const [withdrawalReason, setWithdrawalReason] = useState('');
+  const [withdrawalPaymentMethod, setWithdrawalPaymentMethod] = useState<'Cash' | 'Card'>('Cash');
+  const [isProcessingCard, setIsProcessingCard] = useState(false);
   const [isProcessingWithdrawal, setIsProcessingWithdrawal] = useState(false);
 
   useEffect(() => {
@@ -174,6 +177,16 @@ export default function PosPage() {
       });
       return;
     }
+
+    // Validate card payment amount
+    if (paymentMethod === 'Card' && !isValidCardAmount(total)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Card Amount",
+        description: `Transaction amount must be between R1 and R100,000.`,
+      });
+      return;
+    }
     
     const newSale: Omit<Sale, 'id'> = {
       date: new Date().toISOString(),
@@ -196,6 +209,30 @@ export default function PosPage() {
     }
 
     try {
+      // Process card payment if selected
+      if (paymentMethod === 'Card') {
+        setIsProcessingCard(true);
+        const cardResult = await processCardPayment(total, 'ZAR', `Sale by ${user.firstName} ${user.lastName}`);
+        
+        if (!cardResult.success) {
+          toast({
+            variant: "destructive",
+            title: "Card Payment Failed",
+            description: cardResult.error || "The card machine did not respond. Please try again or use cash.",
+          });
+          setIsProcessingCard(false);
+          return;
+        }
+
+        // Add card transaction ID to sale record
+        newSale.cardTransactionId = cardResult.transactionId;
+        
+        toast({
+          title: "Card Payment Approved",
+          description: `Transaction ID: ${cardResult.transactionId}`,
+        });
+      }
+
       const salesCollection = collection(firestore, `sales`);
       const docRef = await addDocumentNonBlocking(salesCollection, newSale);
 
@@ -221,6 +258,8 @@ export default function PosPage() {
         title: "Sale Failed",
         description: "Could not complete the transaction. Check security rules or network.",
       });
+    } finally {
+      setIsProcessingCard(false);
     }
   }
 
@@ -271,7 +310,31 @@ export default function PosPage() {
         status: 'Withdrawal',
         transactionType: 'withdrawal',
         withdrawalReason: withdrawalReason || 'Cash withdrawal',
+        paymentMethod: withdrawalPaymentMethod,
       };
+
+      // Process card payment if selected
+      if (withdrawalPaymentMethod === 'Card') {
+        const cardResult = await processCardPayment(amount, 'ZAR', `Withdrawal by ${user.firstName} ${user.lastName}`);
+        
+        if (!cardResult.success) {
+          toast({
+            variant: "destructive",
+            title: "Card Withdrawal Failed",
+            description: cardResult.error || "The card machine did not respond. Please try again or use cash.",
+          });
+          setIsProcessingWithdrawal(false);
+          return;
+        }
+
+        // Add card transaction ID to withdrawal record
+        withdrawalTransaction.cardTransactionId = cardResult.transactionId;
+        
+        toast({
+          title: "Card Withdrawal Approved",
+          description: `Transaction ID: ${cardResult.transactionId}`,
+        });
+      }
 
       const salesCollection = collection(firestore, 'sales');
       await addDocumentNonBlocking(salesCollection, withdrawalTransaction);
@@ -284,6 +347,7 @@ export default function PosPage() {
       // Reset form
       setWithdrawalAmount('');
       setWithdrawalReason('');
+      setWithdrawalPaymentMethod('Cash');
       setWithdrawalDialogOpen(false);
     } catch (error) {
       console.error('Withdrawal error:', error);
@@ -358,14 +422,14 @@ export default function PosPage() {
               <ScrollArea className="h-full">
                 {productsLoading ? (
                   <div className="flex items-center justify-center h-full">
-                      <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                    </div>
+                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                  </div>
                 ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pr-4">
-                  {products?.map((product) => (
-                    <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
-                  ))}
-                </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pr-4">
+                    {products?.map((product) => (
+                      <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
+                    ))}
+                  </div>
                 )}
               </ScrollArea>
             </div>
@@ -375,6 +439,7 @@ export default function PosPage() {
                 taxRate={taxRate}
                 paymentMethod={paymentMethod}
                 amountPaid={amountPaid}
+                isProcessingCard={isProcessingCard}
                 onUpdateQuantity={handleUpdateQuantity} 
                 onRemoveItem={handleRemoveItem}
                 onTaxRateChange={handleTaxRateChange}
@@ -398,10 +463,10 @@ export default function PosPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Wallet className="h-5 w-5 text-amber-600" />
-              Cash Withdrawal
+              Withdrawal Request
             </DialogTitle>
             <DialogDescription>
-              Enter the withdrawal amount and optional reason for the cash being withdrawn.
+              Enter the withdrawal amount, payment method, and optional reason.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -421,11 +486,49 @@ export default function PosPage() {
               />
             </div>
             <div>
+              <label className="text-sm font-medium text-gray-700 mb-3 block">
+                Payment Method
+              </label>
+              <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-md">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="withdrawal_cash"
+                    name="withdrawal_method"
+                    value="Cash"
+                    checked={withdrawalPaymentMethod === 'Cash'}
+                    onChange={(e) => setWithdrawalPaymentMethod(e.target.value as 'Cash' | 'Card')}
+                    disabled={isProcessingWithdrawal}
+                    className="h-4 w-4"
+                  />
+                  <label htmlFor="withdrawal_cash" className="text-sm font-medium cursor-pointer">
+                    Cash
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="withdrawal_card"
+                    name="withdrawal_method"
+                    value="Card"
+                    checked={withdrawalPaymentMethod === 'Card'}
+                    onChange={(e) => setWithdrawalPaymentMethod(e.target.value as 'Cash' | 'Card')}
+                    disabled={isProcessingWithdrawal}
+                    className="h-4 w-4"
+                  />
+                  <label htmlFor="withdrawal_card" className="text-sm font-medium cursor-pointer flex items-center gap-1">
+                    <CreditCard className="h-4 w-4" />
+                    Card
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div>
               <label className="text-sm font-medium text-gray-700 mb-2 block">
                 Reason / Description
               </label>
               <Textarea
-                placeholder="e.g., Change float, Banking, Staff payment"
+                placeholder="e.g., Change float, Banking, Staff payment, Merchant advance"
                 value={withdrawalReason}
                 onChange={(e) => setWithdrawalReason(e.target.value)}
                 disabled={isProcessingWithdrawal}
@@ -440,6 +543,7 @@ export default function PosPage() {
                 setWithdrawalDialogOpen(false);
                 setWithdrawalAmount('');
                 setWithdrawalReason('');
+                setWithdrawalPaymentMethod('Cash');
               }}
               disabled={isProcessingWithdrawal}
             >
@@ -458,7 +562,7 @@ export default function PosPage() {
               ) : (
                 <>
                   <Wallet className="mr-2 h-4 w-4" />
-                  Withdraw Cash
+                  {withdrawalPaymentMethod === 'Card' ? 'Process Card Withdrawal' : 'Withdraw Cash'}
                 </>
               )}
             </Button>

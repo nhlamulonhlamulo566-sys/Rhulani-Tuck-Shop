@@ -40,7 +40,8 @@ service cloud.firestore {
         && (data.amountPaid == null || isNumber(data.amountPaid))
         && (data.change == null || isNumber(data.change))
         && (data.transactionType == null || isString(data.transactionType))
-        && (data.withdrawalReason == null || isString(data.withdrawalReason));
+        && (data.withdrawalReason == null || isString(data.withdrawalReason))
+        && (data.cardTransactionId == null || isString(data.cardTransactionId));
     }
     
     function isAuthorizedUpdate(data) {

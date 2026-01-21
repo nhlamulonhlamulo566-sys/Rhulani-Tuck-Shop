@@ -10,8 +10,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Receipt } from './receipt';
+import { CardReceipt } from './card-receipt';
 import type { Sale } from '@/lib/types';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 interface ReceiptModalProps {
   sale: Sale;
@@ -21,6 +22,7 @@ interface ReceiptModalProps {
 
 export function ReceiptModal({ sale, isOpen, onClose }: ReceiptModalProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
+  const [showCardReceipt, setShowCardReceipt] = useState(false);
 
   const handlePrint = () => {
     const printContent = receiptRef.current;
@@ -70,25 +72,46 @@ export function ReceiptModal({ sale, isOpen, onClose }: ReceiptModalProps) {
   if (!isOpen) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Sale Receipt</DialogTitle>
-        </DialogHeader>
-        
-        <div className="overflow-auto max-h-[60vh]">
-          <Receipt ref={receiptRef} sale={sale} />
-        </div>
-        
-        <DialogFooter>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            New Sale
-          </Button>
-          <Button type="button" onClick={handlePrint}>
-            Print Receipt
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={isOpen && !showCardReceipt} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sale Receipt</DialogTitle>
+          </DialogHeader>
+          
+          <div className="overflow-auto max-h-[60vh]">
+            <Receipt ref={receiptRef} sale={sale} />
+          </div>
+          
+          <DialogFooter className="flex gap-2">
+            <Button type="button" variant="secondary" onClick={onClose}>
+              New Sale
+            </Button>
+            {sale.cardTransactionId && (
+              <Button 
+                type="button" 
+                variant="outline"
+                onClick={() => setShowCardReceipt(true)}
+              >
+                Card Receipt
+              </Button>
+            )}
+            <Button type="button" onClick={handlePrint}>
+              Print Receipt
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Card Receipt Modal */}
+      <CardReceipt
+        transaction={sale}
+        isOpen={showCardReceipt && !!sale.cardTransactionId}
+        onClose={() => {
+          setShowCardReceipt(false);
+          onClose();
+        }}
+      />
+    </>
   );
 }
