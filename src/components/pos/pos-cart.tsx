@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import type { CartItem } from '@/lib/types';
-import { X, Plus, Minus } from 'lucide-react';
+import { X, Plus, Minus, CreditCard, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -15,6 +15,7 @@ interface PosCartProps {
   taxRate: number;
   paymentMethod: 'Card' | 'Cash';
   amountPaid: number;
+  isProcessingCard?: boolean;
   onUpdateQuantity: (productId: string, quantity: number) => void;
   onRemoveItem: (productId: string) => void;
   onTaxRateChange: (rate: number) => void;
@@ -28,6 +29,7 @@ export function PosCart({
   taxRate, 
   paymentMethod,
   amountPaid,
+  isProcessingCard = false,
   onUpdateQuantity, 
   onRemoveItem, 
   onTaxRateChange,
@@ -163,14 +165,29 @@ export function PosCart({
                 </>
             )}
             {paymentMethod === 'Card' && (
-                <div className="flex justify-between items-center p-2 bg-blue-50 rounded-md">
-                    <span className="text-sm text-blue-700">Ready for Card Machine</span>
-                    <span className="text-sm font-semibold text-blue-700">R{total.toFixed(2)}</span>
+                <div className={`flex justify-between items-center p-3 rounded-md transition-all ${isProcessingCard ? 'bg-amber-50 border border-amber-200' : 'bg-blue-50'}`}>
+                    <div className="flex items-center gap-2">
+                        <CreditCard className={`h-4 w-4 ${isProcessingCard ? 'text-amber-700' : 'text-blue-700'}`} />
+                        <span className={`text-sm font-medium ${isProcessingCard ? 'text-amber-700' : 'text-blue-700'}`}>
+                            {isProcessingCard ? 'Processing Card...' : 'Ready for Card Machine'}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {isProcessingCard && <Loader2 className="h-4 w-4 animate-spin text-amber-700" />}
+                        <span className={`text-sm font-semibold ${isProcessingCard ? 'text-amber-700' : 'text-blue-700'}`}>R{total.toFixed(2)}</span>
+                    </div>
                 </div>
             )}
         </div>
-        <Button className="w-full mt-4" disabled={isCheckoutDisabled} onClick={onCheckout}>
-          Complete Sale
+        <Button className="w-full mt-4" disabled={isCheckoutDisabled || isProcessingCard} onClick={onCheckout}>
+          {isProcessingCard ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Processing Card Payment...
+            </>
+          ) : (
+            'Complete Sale'
+          )}
         </Button>
       </CardFooter>
     </Card>

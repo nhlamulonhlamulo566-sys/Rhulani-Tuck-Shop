@@ -50,6 +50,7 @@ export type Sale = {
   status: 'Completed' | 'Voided' | 'Returned' | 'Partially Returned' | 'Withdrawal';
   transactionType?: 'sale' | 'withdrawal'; // To distinguish between sales and withdrawals
   withdrawalReason?: string; // Reason for withdrawal
+  cardTransactionId?: string; // Card payment transaction ID from payment gateway
   authorizations?: {
     userId: string;
     userName: string;
