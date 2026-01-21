@@ -199,24 +199,35 @@ export default function SettingsPage() {
   }
 
   const handleDelete = async (userId: string) => {
-    if (userId === adminUser?.id) {
+    try {
+      if (userId === adminUser?.id) {
         toast({ variant: "destructive", title: "Cannot delete self" });
         return;
-    }
+      }
 
-    const userToDelete = users?.find((u) => u.id === userId);
-    if (userToDelete?.role === 'Super Administration' && !canManageSuperAdmins) {
+      const userToDelete = users?.find((u) => u.id === userId);
+      if (userToDelete?.role === 'Super Administration' && !canManageSuperAdmins) {
         toast({
-            variant: "destructive",
-            title: "Permission Denied",
-            description: "Administrators cannot delete Super Administrators.",
+          variant: "destructive",
+          title: "Permission Denied",
+          description: "Administrators cannot delete Super Administrators.",
         });
         return;
+      }
+      
+      setIsLoading(true);
+      const userRef = doc(firestore, 'users', userId);
+      await deleteDoc(userRef);
+      toast({ title: "User Deleted", description: "The user's account has been permanently deleted." });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error Deleting User",
+        description: error.message || "An unexpected error occurred.",
+      });
+    } finally {
+      setIsLoading(false);
     }
-    
-    const userRef = doc(firestore, 'users', userId);
-    await deleteDoc(userRef);
-    toast({ title: "User Deleted", description: "The user's account has been permanently deleted." });
   }
 
   return (
