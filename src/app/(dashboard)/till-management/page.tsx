@@ -169,6 +169,7 @@ const StartSessionCard = ({ users, onStartSession }: { users: UserProfile[]; onS
 interface PaymentStats {
   cash: number;
   card: number;
+  withdrawals: number;
   voids: number;
   returns: number;
   total: number;
@@ -182,7 +183,7 @@ interface PeriodTotals {
 
 type SalespersonTotals = Record<string, PeriodTotals>;
 
-const emptyStats: PaymentStats = { cash: 0, card: 0, voids: 0, returns: 0, total: 0 };
+const emptyStats: PaymentStats = { cash: 0, card: 0, withdrawals: 0, voids: 0, returns: 0, total: 0 };
 const emptyPeriodTotals: PeriodTotals = {
   today: { ...emptyStats },
   thisWeek: { ...emptyStats },
@@ -391,6 +392,11 @@ export default function TillManagementPage() {
                 if (sale.status === 'Voided') {
                 acc[salespersonName][period].voids += sale.total;
                 return;
+                }
+
+                if (sale.status === 'Withdrawal' || sale.transactionType === 'withdrawal') {
+                  acc[salespersonName][period].withdrawals += Math.abs(sale.total);
+                  return;
                 }
 
                 if (sale.status === 'Completed' || sale.status === 'Partially Returned') {
