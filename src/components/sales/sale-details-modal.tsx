@@ -43,7 +43,7 @@ const getStatusBadge = (status: Sale['status']) => {
 export function SaleDetailsModal({ sale, isOpen, onClose }: SaleDetailsModalProps) {
   if (!sale) return null;
 
-  const totalItems = sale.items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalItems = (sale.items || []).reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -67,7 +67,7 @@ export function SaleDetailsModal({ sale, isOpen, onClose }: SaleDetailsModalProp
           <div>
             <h4 className="font-medium text-sm mb-2">Items</h4>
             <div className="space-y-2">
-              {sale.items.map((item, index) => {
+              {(sale.items || []).map((item, index) => {
                 const isReturned = (item.returnedQuantity || 0) > 0;
                 return (
                   <div key={index} className="flex justify-between items-start text-sm">
@@ -104,8 +104,8 @@ export function SaleDetailsModal({ sale, isOpen, onClose }: SaleDetailsModalProp
 
           {/* Payment */}
           <div className="space-y-2">
-            <DetailRow label="Amount Paid" value={`R${sale.amountPaid.toFixed(2)}`} />
-            <DetailRow label="Change" value={`R${sale.change.toFixed(2)}`} />
+            <DetailRow label="Amount Paid" value={`R${(sale.amountPaid || 0).toFixed(2)}`} />
+            <DetailRow label="Change" value={`R${(sale.change || 0).toFixed(2)}`} />
           </div>
         </div>
         <DialogFooter>

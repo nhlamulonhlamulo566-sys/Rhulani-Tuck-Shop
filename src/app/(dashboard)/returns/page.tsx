@@ -66,8 +66,17 @@ function TransactionDetails({ sale, onClear, onSaleUpdate }: { sale: Sale; onCle
     
     // Use transaction to ensure stock and sale are updated together
     try {
+        if (!sale.items) {
+            toast({
+                variant: 'destructive',
+                title: 'Invalid Sale',
+                description: 'Cannot return items from this transaction.',
+            });
+            return;
+        }
+
         await runTransaction(firestore, async (transaction) => {
-            const itemsToReturn = sale.items.map(i => ({ productId: i.productId, quantity: i.quantity - (i.returnedQuantity || 0) })).filter(i => i.quantity > 0);
+            const itemsToReturn = (sale.items || []).map(i => ({ productId: i.productId, quantity: i.quantity - (i.returnedQuantity || 0) })).filter(i => i.quantity > 0);
             if (itemsToReturn.length > 0) {
                  const productRefs = itemsToReturn.map(item => doc(firestore, 'products', item.productId));
                  const productSnaps = await Promise.all(productRefs.map(ref => transaction.get(ref)));
@@ -125,7 +134,7 @@ function TransactionDetails({ sale, onClear, onSaleUpdate }: { sale: Sale; onCle
             });
 
             // 2. Prepare updated sale data
-            const updatedItems = currentSale.items.map(item => {
+            const updatedItems = (currentSale.items || []).map(item => {
                 const returned = returnedItems.find(r => r.productId === item.productId);
                 return returned ? { ...item, returnedQuantity: (item.returnedQuantity || 0) + returned.quantity } : item;
             });
@@ -134,7 +143,7 @@ function TransactionDetails({ sale, onClear, onSaleUpdate }: { sale: Sale; onCle
             const totalReturned = updatedItems.reduce((sum, item) => sum + (item.returnedQuantity || 0), 0);
             const newStatus: Sale['status'] = totalReturned >= totalPurchased ? 'Returned' : 'Partially Returned';
 
-            const returnDetails = returnedItems.map(ri => `${ri.quantity} x ${currentSale.items.find(i => i.productId === ri.productId)?.name}`).join(', ');
+            const returnDetails = returnedItems.map(ri => `${ri.quantity} x ${(currentSale.items || []).find(i => i.productId === ri.productId)?.name}`).join(', ');
 
             const updatedAuthorizations = [
                 ...(currentSale.authorizations || []),
@@ -218,7 +227,7 @@ function TransactionDetails({ sale, onClear, onSaleUpdate }: { sale: Sale; onCle
           <div>
               <h4 className="font-medium mb-2">Items</h4>
               <div className="space-y-2">
-              {sale.items.map((item, index) => {
+              {(sale.items || []).map((item, index) => {
                   return (
                       <div key={index} className="flex justify-between items-center text-sm">
                           <p>

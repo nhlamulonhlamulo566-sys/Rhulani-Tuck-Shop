@@ -58,7 +58,7 @@ export function RecentSales({ products }: RecentSalesProps) {
             </div>
             ) : recentSales && recentSales.length > 0 ? (
             recentSales.map((sale) => {
-                const firstItem = sale.items[0];
+                const firstItem = (sale.items || [])[0];
                 const imageUrl = firstItem ? getProductImage(firstItem.productId) : null;
                 return (
                 <div key={sale.id} className="flex items-center gap-4">
@@ -72,7 +72,7 @@ export function RecentSales({ products }: RecentSalesProps) {
                     <div className="grid gap-1">
                     <p className="text-sm font-medium leading-none">{sale.salesperson}</p>
                     <p className="text-sm text-muted-foreground">
-                        {firstItem?.name}{sale.items.length > 1 ? ` & ${sale.items.length - 1} more` : ''}
+                        {firstItem?.name}{(sale.items && sale.items.length > 1) ? ` & ${sale.items.length - 1} more` : ''}
                     </p>
                     </div>
                     <div className="ml-auto font-medium">+R{sale.total.toFixed(2)}</div>

@@ -68,16 +68,18 @@ export default function TopSellingProducts() {
     const validSales = sales.filter(s => s.status === 'Completed' || s.status === 'Partially Returned');
 
     validSales.forEach(sale => {
-      sale.items.forEach(item => {
-        const productInfo = performanceMap.get(item.productId);
-        if (productInfo) {
-          const soldQty = item.quantity - (item.returnedQuantity || 0);
-          if (soldQty > 0) {
-            productInfo.totalSold += soldQty;
-            productInfo.totalRevenue += soldQty * item.price;
+      if (sale.items) {
+        sale.items.forEach(item => {
+          const productInfo = performanceMap.get(item.productId);
+          if (productInfo) {
+            const soldQty = item.quantity - (item.returnedQuantity || 0);
+            if (soldQty > 0) {
+              productInfo.totalSold += soldQty;
+              productInfo.totalRevenue += soldQty * item.price;
+            }
           }
-        }
-      });
+        });
+      }
     });
 
     // Sort by total units sold in descending order
