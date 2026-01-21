@@ -42,12 +42,17 @@ export default function TillAuditsPage() {
     return query(
       collection(firestore, 'sales'),
       where('date', '>=', today.toISOString()),
-      where('date', '<=', endOfTodayDate.toISOString()),
-      where('status', '==', 'Completed')
+      where('date', '<=', endOfTodayDate.toISOString())
     );
   }, [firestore]);
 
-  const { data: todaySales, isLoading: salesLoading } = useCollection<Sale>(salesQuery);
+  const { data: allTodaySales, isLoading: salesLoading } = useCollection<Sale>(salesQuery);
+  
+  // Filter for completed and withdrawal transactions
+  const todaySales = useMemo(() => {
+    if (!allTodaySales) return [];
+    return allTodaySales.filter(sale => sale.status === 'Completed' || sale.status === 'Withdrawal' || sale.transactionType === 'withdrawal');
+  }, [allTodaySales]);
   
   const sessions = useMemo(() => {
     if (!sessionsUnsorted) return null;
@@ -60,23 +65,34 @@ export default function TillAuditsPage() {
 
   const salesBySalesperson = useMemo(() => {
     if (!todaySales) return {};
-    const summary: Record<string, { netSales: number; count: number }> = {};
+    const summary: Record<string, { netSales: number; count: number; cashSales: number; cardSales: number; withdrawals: number }> = {};
     
     todaySales.forEach(sale => {
       if (!summary[sale.salesperson]) {
-        summary[sale.salesperson] = { netSales: 0, count: 0 };
+        summary[sale.salesperson] = { netSales: 0, count: 0, cashSales: 0, cardSales: 0, withdrawals: 0 };
       }
       summary[sale.salesperson].netSales += sale.total;
       summary[sale.salesperson].count += 1;
+      
+      // Track cash, card, and withdrawals separately
+      if (sale.status === 'Withdrawal' || sale.transactionType === 'withdrawal') {
+        summary[sale.salesperson].withdrawals += Math.abs(sale.total); // withdrawals are negative, so abs them for tracking
+      } else if (sale.paymentMethod === 'Card') {
+        summary[sale.salesperson].cardSales += sale.total;
+      } else {
+        summary[sale.salesperson].cashSales += sale.total;
+      }
     });
     
     return summary;
   }, [todaySales]);
   
   const getExpectedCashWithTodaySales = (session: TillSession): number => {
-    // Calculate expected cash as: opening balance + net sales for today for this salesperson
-    const todayNetSales = salesBySalesperson[session.userName]?.netSales || 0;
-    return (session.openingBalance || 0) + todayNetSales;
+    // Calculate expected cash as: opening balance + cash sales today
+    // Card and withdrawals are automatic (not counted in cash)
+    const salespersonData = salesBySalesperson[session.userName];
+    const todayCashSales = salespersonData?.cashSales || 0;
+    return (session.openingBalance || 0) + todayCashSales;
   };
 
   const getDifferenceVariant = (difference: number = 0) => {
@@ -180,6 +196,9 @@ export default function TillAuditsPage() {
                     <TableHead>Date</TableHead>
                     <TableHead>User</TableHead>
                     <TableHead className="text-right">Opening Float</TableHead>
+                    <TableHead className="text-right">Cash Sales</TableHead>
+                    <TableHead className="text-right">Card Sales</TableHead>
+                    <TableHead className="text-right">Withdrawals</TableHead>
                     <TableHead className="text-right">Expected Cash</TableHead>
                     <TableHead className="text-right">Counted Cash</TableHead>
                     <TableHead className="text-right">Difference</TableHead>
@@ -188,12 +207,16 @@ export default function TillAuditsPage() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center">
+                      <TableCell colSpan={9} className="h-24 text-center">
                         <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
                       </TableCell>
                     </TableRow>
                   ) : sessions && sessions.length > 0 ? (
                     sessions.map((session, idx) => {
+                      const salespersonData = salesBySalesperson[session.userName];
+                      const cashSales = salespersonData?.cashSales || 0;
+                      const cardSales = salespersonData?.cardSales || 0;
+                      const withdrawals = salespersonData?.withdrawals || 0;
                       const calculatedExpectedCash = getExpectedCashWithTodaySales(session);
                       const calculatedDifference = (session.countedCash || 0) - calculatedExpectedCash;
                       return (
@@ -206,11 +229,14 @@ export default function TillAuditsPage() {
                           </TableCell>
                           <TableCell className="font-medium">{session.userName}</TableCell>
                           <TableCell className="text-right font-mono text-sm">{formatCurrency(session.openingBalance)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{formatCurrency(cashSales)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm text-blue-600">{formatCurrency(cardSales)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm text-amber-600">{formatCurrency(withdrawals)}</TableCell>
                           <TableCell>
                             <div className="text-right">
                               <p className="font-mono text-sm">{formatCurrency(calculatedExpectedCash)}</p>
                               <p className="text-xs text-muted-foreground">
-                                {formatCurrency(session.openingBalance)} + {formatCurrency(salesBySalesperson[session.userName]?.netSales || 0)}
+                                {formatCurrency(session.openingBalance)} + {formatCurrency(cashSales)}
                               </p>
                             </div>
                           </TableCell>
@@ -223,7 +249,7 @@ export default function TillAuditsPage() {
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                      <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                         No closed sessions found.
                       </TableCell>
                     </TableRow>

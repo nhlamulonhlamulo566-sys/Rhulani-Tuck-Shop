@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from 'react';
 import PageHeader from '@/components/page-header';
 import { ProductCard } from '@/components/pos/product-card';
 import { PosCart } from '@/components/pos/pos-cart';
-import { PinAuthDialog } from '@/components/auth/pin-auth-dialog';
 import type { Product, CartItem, Sale, UserProfile, TillSession } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
@@ -18,7 +17,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Barcode, Landmark, Loader2, RotateCcw, Trash2, Wallet } from 'lucide-react';
+import { Barcode, Landmark, Loader2, Wallet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ReceiptModal } from '@/components/pos/receipt-modal';
 import { useFirestore, useCollection, useUser, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
@@ -54,7 +53,6 @@ export default function PosPage() {
   const [amountPaid, setAmountPaid] = useState(0);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [pinAuthOpen, setPinAuthOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<'return' | 'void' | 'withdrawal' | null>(null);
   const [authorizingAdmin, setAuthorizingAdmin] = useState<UserProfile | null>(null);
   const [withdrawalDialogOpen, setWithdrawalDialogOpen] = useState(false);
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
@@ -237,13 +235,8 @@ export default function PosPage() {
     });
   }
 
-  const handleRequestAction = (action: 'return' | 'void' | 'withdrawal') => {
-    if (action === 'withdrawal') {
-      setWithdrawalDialogOpen(true);
-    } else {
-      setPendingAction(action);
-      setPinAuthOpen(true);
-    }
+  const handleRequestAction = () => {
+    setWithdrawalDialogOpen(true);
   };
 
   const handleProcessWithdrawal = async () => {
@@ -304,37 +297,6 @@ export default function PosPage() {
     }
   };
 
-  const handlePinSuccess = (admin: UserProfile) => {
-    setAuthorizingAdmin(admin);
-    setPinAuthOpen(false);
-
-    switch (pendingAction) {
-      case 'return':
-        toast({
-          title: "Return Mode Activated",
-          description: `Authorized by ${admin.firstName} ${admin.lastName}. You can now process returns.`,
-        });
-        // Navigate to returns page or activate return mode
-        break;
-      case 'void':
-        toast({
-          title: "Void Mode Activated",
-          description: `Authorized by ${admin.firstName} ${admin.lastName}. You can now void transactions.`,
-        });
-        // Activate void mode
-        break;
-      case 'withdrawal':
-        toast({
-          title: "Withdrawal Mode Activated",
-          description: `Authorized by ${admin.firstName} ${admin.lastName}. Process cash withdrawal.`,
-        });
-        // Activate withdrawal mode
-        break;
-    }
-
-    setPendingAction(null);
-  };
-
   const isLoading = productsLoading || sessionLoading;
 
   if (isLoading) {
@@ -381,25 +343,7 @@ export default function PosPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleRequestAction('return')}
-                className="gap-2"
-              >
-                <RotateCcw className="h-4 w-4" />
-                <span className="hidden sm:inline">Returns</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleRequestAction('void')}
-                className="gap-2"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Voids</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleRequestAction('withdrawal')}
+                onClick={handleRequestAction}
                 className="gap-2"
               >
                 <Wallet className="h-4 w-4" />
@@ -449,13 +393,6 @@ export default function PosPage() {
           onClose={handleCloseReceipt}
         />
       )}
-      <PinAuthDialog
-        open={pinAuthOpen}
-        onOpenChange={setPinAuthOpen}
-        onSuccess={handlePinSuccess}
-        title={`${pendingAction?.charAt(0).toUpperCase()}${pendingAction?.slice(1)} - Administrator PIN Required`}
-        description={`Enter your 6-digit administrator PIN to proceed with ${pendingAction}.`}
-      />
       <Dialog open={withdrawalDialogOpen} onOpenChange={setWithdrawalDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
