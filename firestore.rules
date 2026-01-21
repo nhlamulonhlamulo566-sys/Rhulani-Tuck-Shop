@@ -70,7 +70,7 @@ service cloud.firestore {
     }
 
     // --- Users Collection ---
-    // Allow creation and updates with flexible validation
+    // Allow creation with basic validation, updates with flexible fields
     match /users/{userId} {
       allow read, list: if true; 
       allow create: if isString(request.resource.data.id)
@@ -78,8 +78,13 @@ service cloud.firestore {
         && isString(request.resource.data.lastName)
         && isString(request.resource.data.email)
         && isString(request.resource.data.role)
+        && (request.resource.data.role == 'Administration' || request.resource.data.role == 'Sales' || request.resource.data.role == 'Super Administration')
         && isString(request.resource.data.createdAt);
-      allow update: if request.resource.data.keys().size() > 0;
+      allow update: if request.resource.data.keys().size() > 0
+        && (request.resource.data.firstName == null || isString(request.resource.data.firstName))
+        && (request.resource.data.lastName == null || isString(request.resource.data.lastName))
+        && (request.resource.data.role == null || (isString(request.resource.data.role) && (request.resource.data.role == 'Administration' || request.resource.data.role == 'Sales' || request.resource.data.role == 'Super Administration')))
+        && (request.resource.data.pin == null || (isString(request.resource.data.pin) && (request.resource.data.pin.length() == 0 || request.resource.data.pin.matches('^[0-9]{6}$'))));
       allow delete: if false;
     }
 
