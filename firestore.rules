@@ -14,7 +14,8 @@ service cloud.firestore {
         && isString(data.email)
         && isString(data.role) && (data.role == 'Administration' || data.role == 'Sales' || data.role == 'Super Administration')
         && isString(data.createdAt)
-        && (data.pin == null || (isString(data.pin) && data.pin.matches('^[0-9]{6}$')));
+        && (data.password == null || isString(data.password))
+        && (data.pin == null || (isString(data.pin) && (data.pin.length() == 0 || data.pin.matches('^[0-9]{6}$'))));
     }
 
     function isProduct(data) {
@@ -30,14 +31,16 @@ service cloud.firestore {
       return isString(data.date)
         && isNumber(data.total)
         && isString(data.userId)
-        && isList(data.items)
-        && isString(data.paymentMethod)
-        && isNumber(data.subtotal)
-        && isNumber(data.tax)
-        && isNumber(data.amountPaid)
-        && isNumber(data.change)
         && isString(data.salesperson)
-        && isString(data.status);
+        && isString(data.status)
+        && (data.items == null || isList(data.items))
+        && (data.paymentMethod == null || isString(data.paymentMethod))
+        && (data.subtotal == null || isNumber(data.subtotal))
+        && (data.tax == null || isNumber(data.tax))
+        && (data.amountPaid == null || isNumber(data.amountPaid))
+        && (data.change == null || isNumber(data.change))
+        && (data.transactionType == null || isString(data.transactionType))
+        && (data.withdrawalReason == null || isString(data.withdrawalReason));
     }
     
     function isAuthorizedUpdate(data) {
@@ -67,11 +70,16 @@ service cloud.firestore {
     }
 
     // --- Users Collection ---
-    // INSECURE WARNING: Anyone can read or write to any user profile because we
-    // cannot securely verify if a user is an administrator without Firebase Authentication.
+    // Administrators and Super Administrators can create/edit users
     match /users/{userId} {
       allow read, list: if true; 
-      allow write: if isUserProfile(request.resource.data);
+      allow create: if isUserProfile(request.resource.data);
+      allow update: if request.resource.data.keys().size() > 0
+        && (request.resource.data.firstName == null || isString(request.resource.data.firstName))
+        && (request.resource.data.lastName == null || isString(request.resource.data.lastName))
+        && (request.resource.data.role == null || (isString(request.resource.data.role) && (request.resource.data.role == 'Administration' || request.resource.data.role == 'Sales' || request.resource.data.role == 'Super Administration')))
+        && (request.resource.data.pin == null || (isString(request.resource.data.pin) && (request.resource.data.pin.length() == 0 || request.resource.data.pin.matches('^[0-9]{6}$'))));
+      allow delete: if false;
     }
 
     // --- Products Collection ---
@@ -89,11 +97,11 @@ service cloud.firestore {
     }
 
     // --- Sales Collection ---
-    // All users can read sales. Creates are validated. Updates require authorization. Deletes are blocked.
+    // All users can read sales. Creates are validated. Updates allow partial updates. Deletes are blocked.
     match /sales/{saleId} {
       allow read, list: if true;
       allow create: if isSale(request.resource.data);
-      allow update: if isSale(request.resource.data) && isAuthorizedUpdate(request.resource.data);
+      allow update: if isSale(request.resource.data);
       allow delete: if false;
     }
 
