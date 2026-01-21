@@ -70,7 +70,7 @@ service cloud.firestore {
     }
 
     // --- Users Collection ---
-    // Allow creation with basic validation, updates with flexible fields
+    // Allow creation with basic validation, updates with flexible fields, deletion allowed
     match /users/{userId} {
       allow read, list: if true; 
       allow create: if isString(request.resource.data.id)
@@ -85,25 +85,27 @@ service cloud.firestore {
         && (request.resource.data.lastName == null || isString(request.resource.data.lastName))
         && (request.resource.data.role == null || (isString(request.resource.data.role) && (request.resource.data.role == 'Administration' || request.resource.data.role == 'Sales' || request.resource.data.role == 'Super Administration')))
         && (request.resource.data.pin == null || (isString(request.resource.data.pin) && (request.resource.data.pin.length() == 0 || request.resource.data.pin.matches('^[0-9]{6}$'))));
-      allow delete: if false;
+      allow delete: if true;
     }
 
     // --- Products Collection ---
-    // All signed-in users can read products. Writes are validated.
+    // All signed-in users can read products. Writes and deletes are validated.
     match /products/{productId} {
       allow read, list: if true;
       allow write: if isProduct(request.resource.data);
+      allow delete: if true;
     }
 
     // --- Categories Collection ---
-    // All signed-in users can read categories.
+    // All signed-in users can read categories. Writes and deletes are validated.
     match /categories/{categoryId} {
        allow read, list: if true;
-       allow write: if isString(request.resource.data.name); // Basic validation
+       allow write: if isString(request.resource.data.name);
+       allow delete: if true;
     }
 
     // --- Sales Collection ---
-    // All users can read sales. Creates are validated. Updates allow partial updates. Deletes are blocked.
+    // All users can read sales. Creates are validated. Updates allow partial updates. Deletes are blocked for audit trail.
     match /sales/{saleId} {
       allow read, list: if true;
       allow create: if isSale(request.resource.data);
@@ -112,7 +114,7 @@ service cloud.firestore {
     }
 
     // --- Till Sessions Collection ---
-    // All users can read sessions. Creates/updates are validated. Deletes are blocked.
+    // All users can read sessions. Creates/updates are validated. Deletes are blocked for audit trail.
     match /tillSessions/{sessionId} {
       allow read, list: if true;
       allow create: if isNewTillSession(request.resource.data);
