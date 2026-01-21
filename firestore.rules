@@ -13,7 +13,8 @@ service cloud.firestore {
         && isString(data.lastName)
         && isString(data.email)
         && isString(data.role) && (data.role == 'Administration' || data.role == 'Sales' || data.role == 'Super Administration')
-        && isString(data.createdAt)
+        // allow createdAt to be a string or a timestamp (serverTimestamp)
+        && (isString(data.createdAt) || data.createdAt is timestamp)
         && (data.password == null || isString(data.password))
         && (data.pin == null || (isString(data.pin) && (data.pin.length() == 0 || data.pin.matches('^[0-9]{6}$'))));
     }
@@ -28,7 +29,7 @@ service cloud.firestore {
     }
 
     function isSale(data) {
-      return isString(data.date)
+      return (isString(data.date) || data.date is timestamp)
         && isNumber(data.total)
         && isString(data.userId)
         && isString(data.salesperson)
@@ -49,7 +50,7 @@ service cloud.firestore {
     }
 
     function isNewTillSession(data) {
-       return isString(data.startDate)
+       return (isString(data.startDate) || data.startDate is timestamp)
         && isNumber(data.openingBalance)
         && data.status == 'Active'
         && isString(data.userId)
@@ -58,7 +59,7 @@ service cloud.firestore {
 
     function isClosingTillSession(data) {
        return data.status == 'Closed'
-        && isString(data.endDate)
+      && (isString(data.endDate) || data.endDate is timestamp)
         && isNumber(data.expectedCash)
         && isNumber(data.countedCash)
         && isNumber(data.difference);
