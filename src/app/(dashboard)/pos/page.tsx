@@ -57,10 +57,15 @@ export default function PosPage() {
   const [authorizingAdmin, setAuthorizingAdmin] = useState<UserProfile | null>(null);
   const [withdrawalDialogOpen, setWithdrawalDialogOpen] = useState(false);
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
-  const [withdrawalReason, setWithdrawalReason] = useState('');
+  const [withdrawalReason, setWithdrawalReason] = useState('Cash');
+  const [withdrawalMode, setWithdrawalMode] = useState<'withdrawal' | 'airtime' | 'electricity' | 'voucher'>('withdrawal');
   const [withdrawalPaymentMethod, setWithdrawalPaymentMethod] = useState<'Cash' | 'Card'>('Cash');
   const [isProcessingCard, setIsProcessingCard] = useState(false);
   const [isProcessingWithdrawal, setIsProcessingWithdrawal] = useState(false);
+  const [airtimePhone, setAirtimePhone] = useState('');
+  const [airtimeNetwork, setAirtimeNetwork] = useState('Vodacom');
+  const [electricityMeter, setElectricityMeter] = useState('');
+  const [electricityMunicipality, setElectricityMunicipality] = useState('');
 
   useEffect(() => {
     const savedTaxRate = localStorage.getItem('taxRate');
@@ -275,6 +280,23 @@ export default function PosPage() {
   }
 
   const handleRequestAction = () => {
+    setWithdrawalMode('withdrawal');
+    setWithdrawalReason('Cash');
+    setWithdrawalPaymentMethod('Cash');
+    setWithdrawalDialogOpen(true);
+  };
+
+  const handleBuyAirtime = () => {
+    setWithdrawalMode('airtime');
+    setWithdrawalReason('airtime');
+    setWithdrawalPaymentMethod('Card');
+    setWithdrawalDialogOpen(true);
+  };
+
+  const handleBuyElectricity = () => {
+    setWithdrawalMode('electricity');
+    setWithdrawalReason('electricity');
+    setWithdrawalPaymentMethod('Card');
     setWithdrawalDialogOpen(true);
   };
 
@@ -301,53 +323,102 @@ export default function PosPage() {
     setIsProcessingWithdrawal(true);
 
     try {
-      const withdrawalTransaction: Omit<Sale, 'id'> = {
-        date: new Date().toISOString(),
-        total: -amount, // Negative to indicate withdrawal
-        customerName: 'Cash Withdrawal',
-        userId: user.id,
-        salesperson: `${user.firstName} ${user.lastName}` || 'Unknown',
-        status: 'Withdrawal',
-        transactionType: 'withdrawal',
-        withdrawalReason: withdrawalReason || 'Cash withdrawal',
-        paymentMethod: withdrawalPaymentMethod,
-      };
+      const salesCollection = collection(firestore, 'sales');
+
+      // Build transaction object based on mode
+      let transaction: Omit<Sale, 'id'>;
+
+      if (withdrawalMode === 'withdrawal') {
+        transaction = {
+          date: new Date().toISOString(),
+          total: -amount,
+          customerName: 'Cash Withdrawal',
+          userId: user.id,
+          salesperson: `${user.firstName} ${user.lastName}` || 'Unknown',
+          status: 'Withdrawal',
+          transactionType: 'withdrawal',
+          withdrawalReason: 'Cash',
+          paymentMethod: withdrawalPaymentMethod,
+        };
+      } else if (withdrawalMode === 'airtime') {
+        transaction = {
+          date: new Date().toISOString(),
+          total: amount,
+          customerName: `Airtime - ${airtimeNetwork}`,
+          userId: user.id,
+          salesperson: `${user.firstName} ${user.lastName}` || 'Unknown',
+          status: 'Completed',
+          transactionType: 'airtime',
+          withdrawalReason: 'airtime',
+          paymentMethod: withdrawalPaymentMethod,
+        };
+        // Attach metadata
+        if (airtimePhone) (transaction as any).phone = airtimePhone;
+        (transaction as any).network = airtimeNetwork;
+      } else if (withdrawalMode === 'electricity') {
+        transaction = {
+          date: new Date().toISOString(),
+          total: amount,
+          customerName: `Electricity - ${electricityMunicipality || 'Unknown'}`,
+          userId: user.id,
+          salesperson: `${user.firstName} ${user.lastName}` || 'Unknown',
+          status: 'Completed',
+          transactionType: 'electricity',
+          withdrawalReason: 'electricity',
+          paymentMethod: withdrawalPaymentMethod,
+        };
+        if (electricityMeter) (transaction as any).meter = electricityMeter;
+        if (electricityMunicipality) (transaction as any).municipality = electricityMunicipality;
+      } else {
+        // voucher or other
+        transaction = {
+          date: new Date().toISOString(),
+          total: amount,
+          customerName: withdrawalReason || 'Voucher Purchase',
+          userId: user.id,
+          salesperson: `${user.firstName} ${user.lastName}` || 'Unknown',
+          status: 'Completed',
+          transactionType: 'voucher',
+          withdrawalReason: withdrawalReason || 'voucher',
+          paymentMethod: withdrawalPaymentMethod,
+        };
+      }
 
       // Process card payment if selected
       if (withdrawalPaymentMethod === 'Card') {
-        const cardResult = await processCardPayment(amount, 'ZAR', `Withdrawal by ${user.firstName} ${user.lastName}`);
-        
+        const cardResult = await processCardPayment(amount, 'ZAR', `${transaction.transactionType} by ${user.firstName} ${user.lastName}`);
         if (!cardResult.success) {
           toast({
             variant: "destructive",
-            title: "Card Withdrawal Failed",
+            title: "Card Payment Failed",
             description: cardResult.error || "The card machine did not respond. Please try again or use cash.",
           });
           setIsProcessingWithdrawal(false);
           return;
         }
-
-        // Add card transaction ID to withdrawal record
-        withdrawalTransaction.cardTransactionId = cardResult.transactionId;
-        
+        (transaction as any).cardTransactionId = cardResult.transactionId;
         toast({
-          title: "Card Withdrawal Approved",
+          title: "Card Payment Approved",
           description: `Transaction ID: ${cardResult.transactionId}`,
         });
       }
 
-      const salesCollection = collection(firestore, 'sales');
-      await addDocumentNonBlocking(salesCollection, withdrawalTransaction);
+      await addDocumentNonBlocking(salesCollection, transaction);
 
       toast({
-        title: 'Withdrawal Processed',
-        description: `R${amount.toFixed(2)} has been withdrawn and recorded.`,
+        title: withdrawalMode === 'withdrawal' ? 'Withdrawal Processed' : 'Purchase Recorded',
+        description: withdrawalMode === 'withdrawal' ? `R${amount.toFixed(2)} has been withdrawn and recorded.` : `R${amount.toFixed(2)} recorded for ${transaction.transactionType}.`,
       });
 
       // Reset form
       setWithdrawalAmount('');
-      setWithdrawalReason('');
+      setWithdrawalReason('Cash');
       setWithdrawalPaymentMethod('Cash');
+      setAirtimePhone('');
+      setAirtimeNetwork('Vodacom');
+      setElectricityMeter('');
+      setElectricityMunicipality('');
+      setWithdrawalMode('withdrawal');
       setWithdrawalDialogOpen(false);
     } catch (error) {
       console.error('Withdrawal error:', error);
@@ -412,6 +483,22 @@ export default function PosPage() {
               >
                 <Wallet className="h-4 w-4" />
                 <span className="hidden sm:inline">Withdrawal</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBuyAirtime}
+                className="gap-2"
+              >
+                <span className="hidden sm:inline">Buy Airtime</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBuyElectricity}
+                className="gap-2"
+              >
+                <span className="hidden sm:inline">Buy Electricity</span>
               </Button>
             </div>
           </div>
@@ -527,13 +614,65 @@ export default function PosPage() {
               <label className="text-sm font-medium text-gray-700 mb-2 block">
                 Reason / Description
               </label>
-              <Textarea
-                placeholder="e.g., Change float, Banking, Staff payment, Merchant advance"
-                value={withdrawalReason}
-                onChange={(e) => setWithdrawalReason(e.target.value)}
-                disabled={isProcessingWithdrawal}
-                rows={3}
-              />
+              {withdrawalMode === 'withdrawal' ? (
+                <Textarea
+                  value={withdrawalReason || 'Cash'}
+                  readOnly
+                  disabled
+                  rows={2}
+                />
+              ) : withdrawalMode === 'airtime' ? (
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Recipient phone number"
+                    value={airtimePhone}
+                    onChange={(e) => setAirtimePhone(e.target.value)}
+                    disabled={isProcessingWithdrawal}
+                  />
+                  <select
+                    className="w-full rounded-md border px-3 py-2"
+                    value={airtimeNetwork}
+                    onChange={(e) => setAirtimeNetwork(e.target.value)}
+                    disabled={isProcessingWithdrawal}
+                  >
+                    <option>Vodacom</option>
+                    <option>MTN</option>
+                    <option>Telkom</option>
+                    <option>Cell C</option>
+                  </select>
+                  <Textarea value={"airtime"} readOnly disabled rows={2} />
+                </div>
+              ) : withdrawalMode === 'electricity' ? (
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Meter number / Card number"
+                    value={electricityMeter}
+                    onChange={(e) => setElectricityMeter(e.target.value)}
+                    disabled={isProcessingWithdrawal}
+                  />
+                  <select
+                    className="w-full rounded-md border px-3 py-2"
+                    value={electricityMunicipality}
+                    onChange={(e) => setElectricityMunicipality(e.target.value)}
+                    disabled={isProcessingWithdrawal}
+                  >
+                    <option>eThekwini</option>
+                    <option>City of Johannesburg</option>
+                    <option>City of Tshwane</option>
+                    <option>Nelson Mandela Bay</option>
+                    <option>Other</option>
+                  </select>
+                  <Textarea value={"electricity"} readOnly disabled rows={2} />
+                </div>
+              ) : (
+                <Textarea
+                  placeholder="e.g., voucher provider or note"
+                  value={withdrawalReason}
+                  onChange={(e) => setWithdrawalReason(e.target.value)}
+                  disabled={isProcessingWithdrawal}
+                  rows={3}
+                />
+              )}
             </div>
           </div>
           <DialogFooter className="gap-2">
@@ -542,8 +681,9 @@ export default function PosPage() {
               onClick={() => {
                 setWithdrawalDialogOpen(false);
                 setWithdrawalAmount('');
-                setWithdrawalReason('');
+                setWithdrawalReason('Cash');
                 setWithdrawalPaymentMethod('Cash');
+                setWithdrawalMode('withdrawal');
               }}
               disabled={isProcessingWithdrawal}
             >
@@ -551,7 +691,11 @@ export default function PosPage() {
             </Button>
             <Button
               onClick={handleProcessWithdrawal}
-              disabled={isProcessingWithdrawal || !withdrawalAmount}
+              disabled={
+                isProcessingWithdrawal || !withdrawalAmount ||
+                (withdrawalMode === 'airtime' && !airtimePhone) ||
+                (withdrawalMode === 'electricity' && !electricityMeter)
+              }
               className="bg-amber-600 hover:bg-amber-700 text-white"
             >
               {isProcessingWithdrawal ? (
@@ -562,7 +706,7 @@ export default function PosPage() {
               ) : (
                 <>
                   <Wallet className="mr-2 h-4 w-4" />
-                  {withdrawalPaymentMethod === 'Card' ? 'Process Card Withdrawal' : 'Withdraw Cash'}
+                  {withdrawalMode === 'airtime' ? 'Buy Airtime' : withdrawalMode === 'electricity' ? 'Buy Electricity' : (withdrawalPaymentMethod === 'Card' ? 'Process Card Withdrawal' : 'Withdraw Cash')}
                 </>
               )}
             </Button>
