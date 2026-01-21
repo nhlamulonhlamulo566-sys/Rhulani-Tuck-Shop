@@ -81,7 +81,7 @@ service cloud.firestore {
         && isString(request.resource.data.email)
         && isString(request.resource.data.role)
         && (request.resource.data.role == 'Administration' || request.resource.data.role == 'Sales' || request.resource.data.role == 'Super Administration')
-        && isString(request.resource.data.createdAt);
+        && (isString(request.resource.data.createdAt) || request.resource.data.createdAt is timestamp);
       allow update: if request.resource.data.keys().size() > 0
         && (request.resource.data.firstName == null || isString(request.resource.data.firstName))
         && (request.resource.data.lastName == null || isString(request.resource.data.lastName))
@@ -120,11 +120,7 @@ service cloud.firestore {
     match /tillSessions/{sessionId} {
       allow read, list: if true;
       allow create: if isNewTillSession(request.resource.data);
-      allow update: if request.resource.data.status == 'Closed' 
-        && isString(request.resource.data.endDate)
-        && isNumber(request.resource.data.expectedCash)
-        && isNumber(request.resource.data.countedCash)
-        && isNumber(request.resource.data.difference);
+      allow update: if isClosingTillSession(request.resource.data);
       allow delete: if false;
     }
   }
