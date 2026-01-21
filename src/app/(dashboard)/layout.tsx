@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Home,
@@ -121,8 +122,14 @@ export default function DashboardLayout({
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
             <Link href="/" className="flex items-center gap-2 font-semibold">
-              <Package2 className="h-6 w-6 text-primary" />
-              <span className="font-bold">RHULANI TUCK SHOP</span>
+              <Image 
+                src="/icon.svg" 
+                alt="Rhulani Tuck Shop Logo" 
+                width={32} 
+                height={32} 
+                className="h-8 w-8"
+              />
+              <span className="font-bold hidden lg:inline">RHULANI TUCK SHOP</span>
             </Link>
           </div>
           <div className="flex-1">
@@ -150,7 +157,13 @@ export default function DashboardLayout({
                 size="icon"
                 className="shrink-0 md:hidden"
               >
-                <Package2 className="h-5 w-5" />
+                <Image 
+                  src="/icon.svg" 
+                  alt="Rhulani Tuck Shop Logo" 
+                  width={24} 
+                  height={24} 
+                  className="h-6 w-6"
+                />
                 <span className="sr-only">Toggle navigation menu</span>
               </Button>
             </SheetTrigger>
