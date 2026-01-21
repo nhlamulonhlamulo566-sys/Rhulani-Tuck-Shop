@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   title: 'RHULANI TUCK SHOP',
   description: 'Business Management Dashboard',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/icon.svg',
+  },
 };
 
 export default function RootLayout({
