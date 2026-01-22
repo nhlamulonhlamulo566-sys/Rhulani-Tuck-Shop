@@ -63,7 +63,7 @@ export default function PosPage() {
   const [withdrawalPaymentMethod, setWithdrawalPaymentMethod] = useState<'Cash' | 'Card'>('Cash');
   const [isProcessingCard, setIsProcessingCard] = useState(false);
   const [isProcessingWithdrawal, setIsProcessingWithdrawal] = useState(false);
-  const [airtimePhone, setAirtimePhone] = useState('');
+  const [airtimeVoucherCode, setAirtimeVoucherCode] = useState('');
   const [airtimeNetwork, setAirtimeNetwork] = useState('Vodacom');
   const [electricityMeter, setElectricityMeter] = useState('');
   const [electricityMunicipality, setElectricityMunicipality] = useState('');
@@ -291,6 +291,9 @@ export default function PosPage() {
     setWithdrawalMode('airtime');
     setWithdrawalReason('airtime');
     setWithdrawalPaymentMethod('Card');
+    // Generate random 10-digit voucher code
+    const voucherCode = Math.floor(Math.random() * 10000000000).toString().padStart(10, '0');
+    setAirtimeVoucherCode(voucherCode);
     setWithdrawalDialogOpen(true);
   };
 
@@ -354,8 +357,8 @@ export default function PosPage() {
           paymentMethod: withdrawalPaymentMethod,
         };
         // Attach metadata
-        if (airtimePhone) (transaction as any).phone = airtimePhone;
         (transaction as any).network = airtimeNetwork;
+        (transaction as any).voucherCode = airtimeVoucherCode;
       } else if (withdrawalMode === 'electricity') {
         transaction = {
           date: new Date().toISOString(),
@@ -420,7 +423,7 @@ export default function PosPage() {
       setWithdrawalAmount('');
       setWithdrawalReason('Cash');
       setWithdrawalPaymentMethod('Cash');
-      setAirtimePhone('');
+      setAirtimeVoucherCode('');
       setAirtimeNetwork('Vodacom');
       setElectricityMeter('');
       setElectricityMunicipality('');
@@ -641,25 +644,25 @@ export default function PosPage() {
                   rows={2}
                 />
               ) : withdrawalMode === 'airtime' ? (
-                <div className="space-y-2">
-                  <Input
-                    placeholder="Recipient phone number"
-                    value={airtimePhone}
-                    onChange={(e) => setAirtimePhone(e.target.value)}
-                    disabled={isProcessingWithdrawal}
-                  />
-                  <select
-                    className="w-full rounded-md border px-3 py-2"
-                    value={airtimeNetwork}
-                    onChange={(e) => setAirtimeNetwork(e.target.value)}
-                    disabled={isProcessingWithdrawal}
-                  >
-                    <option>Vodacom</option>
-                    <option>MTN</option>
-                    <option>Telkom</option>
-                    <option>Cell C</option>
-                  </select>
-                  <Textarea value={"airtime"} readOnly disabled rows={2} />
+                <div className="space-y-3 bg-blue-50 p-3 rounded-md border border-blue-200">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700">Network Provider</label>
+                    <select
+                      className="w-full rounded-md border px-3 py-2 mt-1"
+                      value={airtimeNetwork}
+                      onChange={(e) => setAirtimeNetwork(e.target.value)}
+                      disabled={isProcessingWithdrawal}
+                    >
+                      <option>Vodacom</option>
+                      <option>MTN</option>
+                      <option>Telkom</option>
+                      <option>Cell C</option>
+                    </select>
+                  </div>
+                  <div className="bg-white p-2 rounded border border-blue-300">
+                    <p className="text-xs text-gray-600 mb-1">Your Voucher Code:</p>
+                    <p className="text-xl font-bold text-blue-600 text-center">{airtimeVoucherCode}</p>
+                  </div>
                 </div>
               ) : withdrawalMode === 'electricity' ? (
                 <div className="space-y-2">
@@ -703,6 +706,8 @@ export default function PosPage() {
                 setWithdrawalReason('Cash');
                 setWithdrawalPaymentMethod('Cash');
                 setWithdrawalMode('withdrawal');
+                setAirtimeVoucherCode('');
+                setAirtimeNetwork('Vodacom');
               }}
               disabled={isProcessingWithdrawal}
             >
@@ -712,7 +717,7 @@ export default function PosPage() {
               onClick={handleProcessWithdrawal}
               disabled={
                 isProcessingWithdrawal || !withdrawalAmount ||
-                (withdrawalMode === 'airtime' && !airtimePhone) ||
+                (withdrawalMode === 'airtime' && !airtimeVoucherCode) ||
                 (withdrawalMode === 'electricity' && !electricityMeter)
               }
               className="bg-amber-600 hover:bg-amber-700 text-white"

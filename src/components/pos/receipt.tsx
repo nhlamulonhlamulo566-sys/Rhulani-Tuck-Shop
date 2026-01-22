@@ -14,6 +14,14 @@ export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(({ sale },
   const isVoucher = sale.transactionType === 'airtime' || sale.transactionType === 'electricity';
   const voucherTitle = sale.transactionType === 'airtime' ? 'AIRTIME VOUCHER' : sale.transactionType === 'electricity' ? 'ELECTRICITY VOUCHER' : 'RECEIPT';
 
+  // USSD codes for each network
+  const ussdCodes: Record<string, string> = {
+    'Vodacom': '*136*01*PIN#',
+    'MTN': '*141*PIN#',
+    'Telkom': '*100*PIN#',
+    'Cell C': '*102*PIN#',
+  };
+
   return (
     <div ref={ref} className="bg-white text-black font-mono text-xs p-4 w-[302px] mx-auto">
       <div className="text-center mb-4">
@@ -32,16 +40,26 @@ export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(({ sale },
       {/* Voucher-specific details */}
       {isVoucher && (
         <div className="border-b border-dashed border-black pb-2 mb-2">
-          <h2 className="font-bold text-center mb-1">{voucherTitle}</h2>
+          <h2 className="font-bold text-center mb-2">{voucherTitle}</h2>
           {sale.transactionType === 'airtime' && (
             <>
-              <div className="flex justify-between">
+              <div className="flex justify-between mb-1">
                 <span>Network:</span>
-                <span>{(sale as any).network || 'N/A'}</span>
+                <span className="font-bold">{(sale as any).network || 'N/A'}</span>
               </div>
-              <div className="flex justify-between">
-                <span>Phone No:</span>
-                <span>{(sale as any).phone || 'N/A'}</span>
+              
+              {/* Prominent Voucher Code Display */}
+              <div className="border-2 border-black p-2 text-center my-2 bg-gray-100">
+                <p className="text-xs font-bold mb-1">VOUCHER CODE</p>
+                <p className="text-lg font-bold tracking-widest">{(sale as any).voucherCode || 'N/A'}</p>
+              </div>
+
+              {/* USSD Instructions */}
+              <div className="text-xs border-t border-dashed border-black pt-2 mt-2">
+                <p className="font-bold mb-1">TO LOAD VOUCHER:</p>
+                <p className="mb-1">Dial: <span className="font-bold">{ussdCodes[(sale as any).network] || '*100*PIN#'}</span></p>
+                <p className="text-left">Replace PIN with voucher</p>
+                <p className="text-left">code above</p>
               </div>
             </>
           )}
