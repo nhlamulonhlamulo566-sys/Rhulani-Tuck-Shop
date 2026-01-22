@@ -53,6 +53,7 @@ export default function PosPage() {
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Card'>('Cash');
   const [amountPaid, setAmountPaid] = useState(0);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
+  const [completedVoucher, setCompletedVoucher] = useState<Sale | null>(null);
   const [pinAuthOpen, setPinAuthOpen] = useState(false);
   const [authorizingAdmin, setAuthorizingAdmin] = useState<UserProfile | null>(null);
   const [withdrawalDialogOpen, setWithdrawalDialogOpen] = useState(false);
@@ -405,6 +406,11 @@ export default function PosPage() {
 
       await addDocumentNonBlocking(salesCollection, transaction);
 
+      // Show receipt/voucher for airtime and electricity
+      if (withdrawalMode === 'airtime' || withdrawalMode === 'electricity') {
+        setCompletedVoucher({ ...transaction, id: Date.now().toString() });
+      }
+
       toast({
         title: withdrawalMode === 'withdrawal' ? 'Withdrawal Processed' : 'Purchase Recorded',
         description: withdrawalMode === 'withdrawal' ? `R${amount.toFixed(2)} has been withdrawn and recorded.` : `R${amount.toFixed(2)} recorded for ${transaction.transactionType}.`,
@@ -545,15 +551,28 @@ export default function PosPage() {
           onClose={handleCloseReceipt}
         />
       )}
+      {completedVoucher && (
+        <ReceiptModal
+          sale={completedVoucher}
+          isOpen={!!completedVoucher}
+          onClose={() => {
+            setCompletedVoucher(null);
+            toast({
+              title: `${completedVoucher.transactionType === 'airtime' ? 'Airtime' : 'Electricity'} Voucher Printed`,
+              description: 'Transaction recorded in the system.',
+            });
+          }}
+        />
+      )}
       <Dialog open={withdrawalDialogOpen} onOpenChange={setWithdrawalDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Wallet className="h-5 w-5 text-amber-600" />
-              Withdrawal Request
+              {withdrawalMode === 'airtime' ? 'Airtime Request' : withdrawalMode === 'electricity' ? 'Electricity Request' : 'Withdrawal Request'}
             </DialogTitle>
             <DialogDescription>
-              Enter the withdrawal amount, payment method, and optional reason.
+              {withdrawalMode === 'airtime' ? 'Enter airtime amount and recipient details.' : withdrawalMode === 'electricity' ? 'Enter electricity amount and meter details.' : 'Enter the withdrawal amount, payment method, and optional reason.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
