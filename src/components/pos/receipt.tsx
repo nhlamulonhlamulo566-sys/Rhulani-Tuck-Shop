@@ -11,6 +11,8 @@ interface ReceiptProps {
 
 export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(({ sale }, ref) => {
   const formatCurrency = (amount: number) => `R${amount.toFixed(2)}`;
+  const isVoucher = sale.transactionType === 'airtime' || sale.transactionType === 'electricity';
+  const voucherTitle = sale.transactionType === 'airtime' ? 'AIRTIME VOUCHER' : sale.transactionType === 'electricity' ? 'ELECTRICITY VOUCHER' : 'RECEIPT';
 
   return (
     <div ref={ref} className="bg-white text-black font-mono text-xs p-4 w-[302px] mx-auto">
@@ -24,38 +26,76 @@ export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(({ sale },
         <span>Date: {format(new Date(sale.date), 'yyyy-MM-dd')}</span>
         <span>Time: {format(new Date(sale.date), 'HH:mm:ss')}</span>
       </div>
-      <p>Receipt No: {sale.id}</p>
+      <p>Ref No: {sale.id}</p>
       <p className="mb-2">Salesperson: {sale.salesperson}</p>
 
-      <div className="border-t border-dashed border-black pt-2 mb-2">
-        <div className="flex font-bold">
-          <span className="flex-grow">ITEM</span>
-          <span className="w-8 text-center">QTY</span>
-          <span className="w-16 text-right">PRICE</span>
+      {/* Voucher-specific details */}
+      {isVoucher && (
+        <div className="border-b border-dashed border-black pb-2 mb-2">
+          <h2 className="font-bold text-center mb-1">{voucherTitle}</h2>
+          {sale.transactionType === 'airtime' && (
+            <>
+              <div className="flex justify-between">
+                <span>Network:</span>
+                <span>{(sale as any).network || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Phone No:</span>
+                <span>{(sale as any).phone || 'N/A'}</span>
+              </div>
+            </>
+          )}
+          {sale.transactionType === 'electricity' && (
+            <>
+              <div className="flex justify-between">
+                <span>Municipality:</span>
+                <span>{(sale as any).municipality || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Meter No:</span>
+                <span>{(sale as any).meter || 'N/A'}</span>
+              </div>
+            </>
+          )}
         </div>
-        {(sale.items || []).map((item, index) => (
-            <div key={index} className="flex">
-              <span className="flex-grow pr-2">{item.name}</span>
-              <span className="w-8 text-center">{item.quantity}</span>
-              <span className="w-16 text-right">{formatCurrency(item.price * item.quantity)}</span>
-            </div>
-          ))}
-      </div>
+      )}
+
+      {/* Items section (only for regular sales) */}
+      {!isVoucher && (
+        <div className="border-t border-dashed border-black pt-2 mb-2">
+          <div className="flex font-bold">
+            <span className="flex-grow">ITEM</span>
+            <span className="w-8 text-center">QTY</span>
+            <span className="w-16 text-right">PRICE</span>
+          </div>
+          {(sale.items || []).map((item, index) => (
+              <div key={index} className="flex">
+                <span className="flex-grow pr-2">{item.name}</span>
+                <span className="w-8 text-center">{item.quantity}</span>
+                <span className="w-16 text-right">{formatCurrency(item.price * item.quantity)}</span>
+              </div>
+            ))}
+        </div>
+      )}
       
       <div className="border-t border-dashed border-black pt-1">
           <div className="flex justify-end">
               <div className="w-40">
-                  <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <span>{formatCurrency(sale.subtotal || 0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                      <span>Tax:</span>
-                      <span>{formatCurrency(sale.tax || 0)}</span>
-                  </div>
+                  {!isVoucher && (
+                    <>
+                      <div className="flex justify-between">
+                          <span>Subtotal:</span>
+                          <span>{formatCurrency(sale.subtotal || 0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                          <span>Tax:</span>
+                          <span>{formatCurrency(sale.tax || 0)}</span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex justify-between font-bold">
-                      <span>Total:</span>
-                      <span>{formatCurrency(sale.total)}</span>
+                      <span>{isVoucher ? 'Amount' : 'Total'}:</span>
+                      <span>{formatCurrency(Math.abs(sale.total))}</span>
                   </div>
               </div>
           </div>
@@ -67,7 +107,7 @@ export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(({ sale },
               <span>Payment Method:</span>
               <span>{sale.paymentMethod}</span>
           </div>
-          {sale.paymentMethod === 'Cash' && (
+          {sale.paymentMethod === 'Cash' && !isVoucher && (
               <>
               <div className="flex justify-between">
                   <span>Amount Paid:</span>
@@ -81,19 +121,21 @@ export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(({ sale },
           )}
       </div>
 
-      <div className="pt-2 mt-4 text-center">
-        <h2 className="font-bold mb-1">RETURN POLICY</h2>
-        <ul className="text-left list-disc list-inside space-y-1 text-[10px] leading-tight">
-          <li>Returns accepted within 1 day of purchase.</li>
-          <li>Valid receipt required for all returns.</li>
-          <li>Items must be in original, unused condition.</li>
-          <li>Refunds issued to original payment method.</li>
-          <li>Perishables or final sale items not returnable.</li>
-          <li>No returns on voided transactions.</li>
-        </ul>
-      </div>
+      {!isVoucher && (
+        <div className="pt-2 mt-4 text-center">
+          <h2 className="font-bold mb-1">RETURN POLICY</h2>
+          <ul className="text-left list-disc list-inside space-y-1 text-[10px] leading-tight">
+            <li>Returns accepted within 1 day of purchase.</li>
+            <li>Valid receipt required for all returns.</li>
+            <li>Items must be in original, unused condition.</li>
+            <li>Refunds issued to original payment method.</li>
+            <li>Perishables or final sale items not returnable.</li>
+            <li>No returns on voided transactions.</li>
+          </ul>
+        </div>
+      )}
 
-      <p className="text-center my-4">Thank you for your purchase!</p>
+      <p className="text-center my-4">{isVoucher ? 'Voucher has been purchased successfully!' : 'Thank you for your purchase!'}</p>
 
       <div className="flex justify-center">
         <Barcode value={sale.id} height={40} width={1.5} fontSize={10} />
