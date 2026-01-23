@@ -169,7 +169,7 @@ export function PosCart({
                     <div className="flex items-center gap-2">
                         <CreditCard className={`h-4 w-4 ${isProcessingCard ? 'text-amber-700' : 'text-blue-700'}`} />
                         <span className={`text-sm font-medium ${isProcessingCard ? 'text-amber-700' : 'text-blue-700'}`}>
-                            {isProcessingCard ? 'Processing Card...' : 'Ready for Card Machine'}
+                            {isProcessingCard ? 'Processing Card...' : 'Ready for Card Payment'}
                         </span>
                     </div>
                     <div className="flex items-center gap-2">

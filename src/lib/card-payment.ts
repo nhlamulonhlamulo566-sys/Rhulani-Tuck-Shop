@@ -1,7 +1,7 @@
 /**
- * Card Payment Integration Module
- * Supports multiple payment gateways for plug-and-play integration
- * Current implementation: Stripe (via browser-based terminal)
+ * Card Payment Module - Local Processing Only
+ * All card transactions are saved locally to Firestore database
+ * No external payment gateway integration
  */
 
 export interface CardPaymentConfig {
@@ -30,25 +30,13 @@ export interface CardMachineStatus {
 }
 
 /**
- * Initialize card payment gateway
+ * Initialize card payment (local only)
+ * Card transactions are processed and saved locally to the system
  */
 export async function initializeCardPayment(config: CardPaymentConfig): Promise<boolean> {
   try {
-    // Store config in sessionStorage for security (won't persist)
-    if (config.provider === 'stripe' && config.apiKey) {
-      sessionStorage.setItem('STRIPE_API_KEY', config.apiKey);
-      console.log('✓ Stripe card payment initialized');
-      return true;
-    }
-    
-    if (config.provider === 'square' && config.apiKey) {
-      sessionStorage.setItem('SQUARE_API_KEY', config.apiKey);
-      console.log('✓ Square card payment initialized');
-      return true;
-    }
-
-    console.warn('⚠ Card payment provider not configured');
-    return false;
+    console.log('✓ Local card payment enabled - all transactions saved to system database');
+    return true;
   } catch (error) {
     console.error('✗ Failed to initialize card payment:', error);
     return false;
@@ -56,8 +44,8 @@ export async function initializeCardPayment(config: CardPaymentConfig): Promise<
 }
 
 /**
- * Process card payment via configured gateway
- * In production, this would communicate with your payment backend
+ * Process card payment locally
+ * Card transactions are saved locally only - no live machine integration
  */
 export async function processCardPayment(
   amount: number,
@@ -67,23 +55,8 @@ export async function processCardPayment(
   try {
     const timestamp = new Date().toISOString();
     
-    // Check if payment gateway is initialized
-    const stripeKey = sessionStorage.getItem('STRIPE_API_KEY');
-    const squareKey = sessionStorage.getItem('SQUARE_API_KEY');
-
-    if (!stripeKey && !squareKey) {
-      return {
-        success: false,
-        amount,
-        currency,
-        timestamp,
-        method: 'manual',
-        error: 'Card payment gateway not initialized. Please configure payment settings.',
-      };
-    }
-
-    // Simulate card transaction processing
-    // In production, this would use actual Stripe Terminal API or Square SDK
+    // Generate local card transaction ID
+    // Card data is saved locally to the system only
     return {
       success: true,
       transactionId: generateTransactionId(),
@@ -98,30 +71,29 @@ export async function processCardPayment(
       amount,
       currency,
       timestamp: new Date().toISOString(),
-      method: 'manual',
-      error: error instanceof Error ? error.message : 'Card payment failed',
+      method: 'card',
+      error: error instanceof Error ? error.message : 'Card payment processing failed',
     };
   }
 }
 
 /**
- * Check card machine connectivity status
+ * Check card payment system status
+ * Always returns ready since all card payments are processed locally
  */
-export async function checkCardMachineStatus(provider: string = 'stripe'): Promise<CardMachineStatus> {
+export async function checkCardMachineStatus(provider: string = 'local'): Promise<CardMachineStatus> {
   try {
-    const isConnected = sessionStorage.getItem(`${provider.toUpperCase()}_API_KEY`) !== null;
-    
     return {
-      isConnected,
-      provider,
+      isConnected: true,
+      provider: 'local',
       lastCheckTime: new Date().toISOString(),
-      batteryLevel: isConnected ? 95 : 0,
-      signalStrength: isConnected ? 4 : 0,
+      batteryLevel: 100,
+      signalStrength: 5,
     };
   } catch (error) {
     return {
       isConnected: false,
-      provider,
+      provider: 'local',
       lastCheckTime: new Date().toISOString(),
     };
   }
