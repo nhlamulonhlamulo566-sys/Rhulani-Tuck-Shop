@@ -224,18 +224,18 @@ export default function PosPage() {
           toast({
             variant: "destructive",
             title: "Card Payment Failed",
-            description: cardResult.error || "The card machine did not respond. Please try again or use cash.",
+            description: cardResult.error || "Card payment could not be processed.",
           });
           setIsProcessingCard(false);
           return;
         }
 
-        // Add card transaction ID to sale record
+        // Add card transaction ID to sale record (saved locally)
         newSale.cardTransactionId = cardResult.transactionId;
         
         toast({
-          title: "Card Payment Approved",
-          description: `Transaction ID: ${cardResult.transactionId}`,
+          title: "Card Payment Processed",
+          description: `Transaction ID: ${cardResult.transactionId} - Saved locally`,
         });
       }
 
@@ -395,15 +395,15 @@ export default function PosPage() {
           toast({
             variant: "destructive",
             title: "Card Payment Failed",
-            description: cardResult.error || "The card machine did not respond. Please try again or use cash.",
+            description: cardResult.error || "Card payment could not be processed.",
           });
           setIsProcessingWithdrawal(false);
           return;
         }
         (transaction as any).cardTransactionId = cardResult.transactionId;
         toast({
-          title: "Card Payment Approved",
-          description: `Transaction ID: ${cardResult.transactionId}`,
+          title: "Card Payment Processed",
+          description: `Transaction ID: ${cardResult.transactionId} - Saved locally`,
         });
       }
 
