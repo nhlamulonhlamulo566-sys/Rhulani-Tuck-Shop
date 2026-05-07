@@ -146,7 +146,7 @@ export default function CashUpPage() {
             return;
           }
 
-          if (sale.status === 'Withdrawal' || sale.transactionType === 'withdrawal') {
+          if (sale.transactionType === 'withdrawal') {
             acc[salespersonName][period].withdrawals += Math.abs(sale.total);
           }
 
