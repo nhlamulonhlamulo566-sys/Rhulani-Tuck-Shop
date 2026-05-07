@@ -550,11 +550,11 @@ export default function TillManagementPage() {
                                                             </div>
                                                             <div className="bg-background rounded p-2">
                                                                 <p className="text-muted-foreground">Expected</p>
-                                                                <p className="font-mono font-semibold">R{Number(h.expectedCash || 0).toFixed(2)}</p>
+                                                                <p className="font-mono font-semibold">R{Number(h.expectedCash ?? h.expectedBalance ?? 0).toFixed(2)}</p>
                                                             </div>
                                                             <div className="bg-background rounded p-2">
                                                                 <p className="text-muted-foreground">Counted</p>
-                                                                <p className="font-mono font-semibold">R{Number(h.countedCash || 0).toFixed(2)}</p>
+                                                                <p className="font-mono font-semibold">R{Number(h.countedCash ?? h.closingBalance ?? 0).toFixed(2)}</p>
                                                             </div>
                                                         </div>
                                                     </div>

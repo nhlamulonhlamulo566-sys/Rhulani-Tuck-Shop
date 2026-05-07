@@ -1,0 +1,20 @@
+{
+    "sqltools.connections": [
+        {
+            "mysqlOptions": {
+                "authProtocol": "default",
+                "enableSsl": "Disabled"
+            },
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "0.tcp.sa.ngrok.io",
+            "port": 26175,
+            "driver": "MySQL",
+            "name": "rhulanituckshop",
+            "connectionTimeout": 50,
+            "username": "jeff",
+            "database": "rhulanituckshop",
+            "password": "0813210332@Jeff"
+        }
+    ]
+}
