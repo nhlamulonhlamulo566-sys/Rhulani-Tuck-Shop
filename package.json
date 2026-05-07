@@ -1,13 +1,71 @@
 {
-  "name": "nextn",
-  "version": "0.1.0",
+  "name": "rhulani-tuck-shop",
+  "version": "1.0.0",
   "private": true,
+  "main": "public/electron-main.js",
+  "homepage": "./",
   "scripts": {
     "dev": "next dev -p 9002",
     "build": "cross-env NODE_ENV=production next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "electron-dev": "electron .",
+    "electron-build": "npm run build && electron-builder",
+    "electron-build-win": "npm run build && electron-builder --win",
+    "electron-build-mac": "npm run build && electron-builder --mac",
+    "electron-build-linux": "npm run build && electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.rhulanituckshop.app",
+    "productName": "Rhulani Tuck Shop",
+    "directories": {
+      "buildResources": "public"
+    },
+    "files": [
+      "public/**/*",
+      ".next/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Rhulani Tuck Shop"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.business"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office"
+    }
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.8",
@@ -59,6 +117,10 @@
     "@types/react": "^19.2.1",
     "@types/react-dom": "^19.2.1",
     "cross-env": "^10.1.0",
+    "electron": "^42.0.0",
+    "electron-builder": "^26.8.1",
+    "electron-is-dev": "^3.0.1",
+    "electron-updater": "^6.8.3",
     "eslint": "9.39.4",
     "eslint-config-next": "^15.5.9",
     "postcss": "^8",
