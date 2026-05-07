@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import type { Sale } from '@/lib/types';
 import { format } from 'date-fns';
 import { Badge } from '../ui/badge';
+import { toMoney } from '@/lib/format-utils';
 
 interface SaleDetailsModalProps {
   sale: Sale | null;
@@ -96,7 +97,7 @@ export function SaleDetailsModal({ sale, isOpen, onClose }: SaleDetailsModalProp
             <DetailRow label="Total Items" value={totalItems.toString()} />
             <div className="flex justify-between items-baseline text-sm">
                 <p className="text-muted-foreground">Total</p>
-                <p className="font-bold text-lg">R{sale.total.toFixed(2)}</p>
+                <p className="font-bold text-lg">R{toMoney(sale.total)}</p>
             </div>
           </div>
 
@@ -104,8 +105,8 @@ export function SaleDetailsModal({ sale, isOpen, onClose }: SaleDetailsModalProp
 
           {/* Payment */}
           <div className="space-y-2">
-            <DetailRow label="Amount Paid" value={`R${(sale.amountPaid || 0).toFixed(2)}`} />
-            <DetailRow label="Change" value={`R${(sale.change || 0).toFixed(2)}`} />
+            <DetailRow label="Amount Paid" value={`R${toMoney(sale.amountPaid || 0)}`} />
+            <DetailRow label="Change" value={`R${toMoney(sale.change || 0)}`} />
           </div>
         </div>
         <DialogFooter>

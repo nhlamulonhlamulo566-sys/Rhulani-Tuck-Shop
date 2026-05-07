@@ -5,10 +5,12 @@ import PageHeader from '@/components/page-header';
 import SummaryCard from '@/components/dashboard/summary-card';
 import { OverviewChart } from '@/components/dashboard/overview-chart';
 import { RecentSales } from '@/components/dashboard/recent-sales';
-import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+// import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase'; // Removed Firebase
+// import { collection, query, where } from 'firebase/firestore'; // Removed Firebase
+import { useCollection } from '@/hooks/use-db-collection';
+import { toMoney } from '@/lib/format-utils';
 import type { Sale, Product, UserProfile } from '@/lib/types';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 
 // Helper function to calculate the actual total after returns
 const getAdjustedSaleTotal = (sale: Sale) => {
@@ -29,29 +31,25 @@ const getAdjustedSaleTotal = (sale: Sale) => {
 
 
 export default function DashboardPage() {
-  const { user } = useUser() as { user: UserProfile | null };
-  const firestore = useFirestore();
-
-  // SECURITY FIX: Query sales based on user role.
-  // Admins see all sales, Sales roles see only their own.
-  const salesQuery = useMemoFirebase(() => {
-    if (!user) return null;
-    
-    const salesCollection = collection(firestore, 'sales');
-    if (user.role === 'Administration' || user.role === 'Super Administration') {
-      return query(salesCollection);
-    }
-    // For 'Sales' role, only fetch their own sales
-    return query(salesCollection, where('userId', '==', user.id));
-  }, [firestore, user]);
+  const [user, setUser] = useState<UserProfile | null>(null);
   
-  const { data: sales, isLoading: salesLoading } = useCollection<Sale>(salesQuery);
+  useEffect(() => {
+    // TODO: Get user from MySQL session
+    const userDataStr = sessionStorage.getItem('currentUser');
+    if (userDataStr) {
+      try {
+        setUser(JSON.parse(userDataStr));
+      } catch (e) {
+        console.error('Failed to parse user data');
+      }
+    }
+  }, []);
 
-  const productsQuery = useMemoFirebase(
-    () => query(collection(firestore, 'products')),
-    [firestore]
-  );
-  const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
+  // Fetch sales from MySQL API
+  const { data: sales, isLoading: salesLoading } = useCollection<Sale>('/api/sales');
+
+  // Fetch products from MySQL API
+  const { data: products, isLoading: productsLoading } = useCollection<Product>('/api/products');
 
   const dashboardData = useMemo(() => {
     if (!sales || !products) {
@@ -93,7 +91,7 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <SummaryCard 
           title="Total Revenue" 
-          value={`R${dashboardData.totalRevenue.toFixed(2)}`} 
+          value={`R${toMoney(dashboardData.totalRevenue)}`} 
           icon={DollarSign} 
         />
         <SummaryCard 

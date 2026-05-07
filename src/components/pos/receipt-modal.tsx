@@ -10,11 +10,12 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Receipt } from './receipt';
-import { CardReceipt } from './card-receipt';
 import type { Sale } from '@/lib/types';
-import { useRef, useState } from 'react';
+import { useRef, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { shouldAutoPrint, getAutoPrintNotification } from '@/lib/receipt-printing';
+import { useToast } from '@/hooks/use-toast';
 
 interface ReceiptModalProps {
   sale: Sale;
@@ -24,10 +25,27 @@ interface ReceiptModalProps {
 
 export function ReceiptModal({ sale, isOpen, onClose }: ReceiptModalProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
-  const [showCardReceipt, setShowCardReceipt] = useState(false);
+  const { toast } = useToast();
 
-  const isVoucher = sale.transactionType === 'airtime' || sale.transactionType === 'electricity';
-  const voucherTitle = sale.transactionType === 'airtime' ? 'Airtime Voucher' : sale.transactionType === 'electricity' ? 'Electricity Voucher' : 'Receipt';
+  // Determine if auto-print should be triggered
+  const autoPrintEnabled = shouldAutoPrint(
+    sale.paymentMethod as 'Card' | 'Cash',
+    sale.change || 0
+  );
+
+  // Show notification when auto-print is triggered
+  useEffect(() => {
+    if (isOpen && autoPrintEnabled) {
+      const notification = getAutoPrintNotification(
+        sale.paymentMethod as 'Card' | 'Cash',
+        sale.change || 0
+      );
+      toast({
+        title: notification.title,
+        description: notification.description,
+      });
+    }
+  }, [isOpen, autoPrintEnabled, sale.paymentMethod, sale.change, toast]);
 
   const handlePrint = () => {
     const printContent = receiptRef.current;
@@ -87,7 +105,7 @@ export function ReceiptModal({ sale, isOpen, onClose }: ReceiptModalProps) {
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
       pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-      pdf.save(`${isVoucher ? voucherTitle : 'receipt'}-${sale.id}.pdf`);
+      pdf.save(`receipt-${sale.id}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
     }
@@ -96,49 +114,45 @@ export function ReceiptModal({ sale, isOpen, onClose }: ReceiptModalProps) {
   if (!isOpen) return null;
 
   return (
-    <>
-      <Dialog open={isOpen && !showCardReceipt} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{isVoucher ? voucherTitle : 'Sale Receipt'}</DialogTitle>
+            <DialogTitle>Receipt</DialogTitle>
           </DialogHeader>
           
-          <div className="overflow-auto max-h-[60vh]">
-            <Receipt ref={receiptRef} sale={sale} />
+          <div className="space-y-4">
+            {/* Sale Receipt */}
+            <Receipt 
+              ref={receiptRef} 
+              sale={sale} 
+              autoPrint={autoPrintEnabled}
+              autoPrintDelay={1500}
+            />
+
+            {sale.cardTransactionId && (
+              <>
+                <div className="border-t border-dashed my-4"></div>
+                <div className="text-center space-y-2">
+                  <p className="font-bold">CARD RECEIPT</p>
+                  <p className="text-sm">Transaction ID:</p>
+                  <p className="font-mono text-xs font-bold">{sale.cardTransactionId}</p>
+                </div>
+              </>
+            )}
           </div>
           
-          <DialogFooter className="flex gap-2">
+          <DialogFooter className="flex gap-2 flex-wrap">
             <Button type="button" variant="secondary" onClick={onClose}>
-              {isVoucher ? 'Done' : 'New Sale'}
+              New Sale
             </Button>
-            {sale.cardTransactionId && !isVoucher && (
-              <Button 
-                type="button" 
-                variant="outline"
-                onClick={() => setShowCardReceipt(true)}
-              >
-                Card Receipt
-              </Button>
-            )}
             <Button type="button" variant="outline" onClick={handleDownloadPDF}>
               Download PDF
             </Button>
             <Button type="button" onClick={handlePrint}>
-              Print {isVoucher ? 'Voucher' : 'Receipt'}
+              Print Receipt
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Card Receipt Modal */}
-      <CardReceipt
-        transaction={sale}
-        isOpen={showCardReceipt && !!sale.cardTransactionId}
-        onClose={() => {
-          setShowCardReceipt(false);
-          onClose();
-        }}
-      />
-    </>
   );
 }

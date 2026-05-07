@@ -11,8 +11,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore } from '@/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 
@@ -34,7 +32,6 @@ export function PinAuthDialog({
   const [pin, setPin] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const firestore = useFirestore();
 
   const handleVerifyPin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,20 +46,18 @@ export function PinAuthDialog({
 
     setIsLoading(true);
     try {
-      const usersRef = collection(firestore, 'users');
-      const q = query(
-        usersRef,
-        where('pin', '==', pin),
-        where('role', 'in', ['Administration', 'Super Administration'])
-      );
+      const response = await fetch('/api/auth/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      });
 
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
-        throw new Error('Invalid PIN or user is not an administrator.');
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'PIN verification failed');
       }
 
-      const adminUser = querySnapshot.docs[0].data() as UserProfile;
+      const { user: adminUser } = await response.json();
       
       toast({
         title: 'Authorization Successful',

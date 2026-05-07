@@ -20,6 +20,10 @@ import {
   ClipboardList,
   Landmark,
   GanttChartSquare,
+  Lock,
+  CreditCard,
+  AlertTriangle,
+  Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,7 +36,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { useUser } from '@/firebase';
+// import { useUser } from '@/firebase'; // Removed Firebase dependency
 import type { UserProfile } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -40,13 +44,17 @@ const allNavItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard', role: 'Administration' },
   { href: '/sales', icon: LineChart, label: 'Sales', role: 'Administration' },
   { href: '/till-management', icon: Landmark, label: 'Till Management', role: 'Administration' },
-  { href: '/till-audits', icon: GanttChartSquare, label: 'Till Audits', role: 'Administration' },
-  { href: '/reports', icon: AreaChart, label: 'Reports', role: 'Administration' },
+  { href: '/till-reconciliation', icon: GanttChartSquare, label: 'Till Reconciliation', role: 'Administration' },
+  { href: '/discrepancy-review', icon: AlertTriangle, label: 'Discrepancy Review', role: 'Administration' },
+  { href: '/daily-reports', icon: AreaChart, label: 'Daily Reports', role: 'Administration' },
+  { href: '/transaction-history', icon: ClipboardList, label: 'Transaction History', role: 'Administration' },
   { href: '/products', icon: Package, label: 'Products', role: 'Administration' },
-  { href: '/pos', icon: ShoppingCart, label: 'POS', role: 'All' },
+  { href: '/pos', icon: ShoppingCart, label: 'Point of Sale', role: 'All' },
   { href: '/stock-count', icon: Boxes, label: 'Stock Count', role: 'Administration' },
   { href: '/reorder-hub', icon: ClipboardList, label: 'Reorder Hub', role: 'Administration' },
-  { href: '/returns', icon: Undo2, label: 'Returns & Voids', role: 'All' },
+  { href: '/card-machine', icon: CreditCard, label: 'Card Machine', role: 'Administration' },
+  { href: '/admin-pin', icon: Lock, label: 'Admin PIN', role: 'Administration' },
+  { href: '/store-hours', icon: Clock, label: 'Store Hours', role: 'Super Administration' },
   { href: '/settings', icon: Settings, label: 'Settings', role: 'Administration' },
 ];
 
@@ -55,20 +63,44 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user: userProfile, isUserLoading, logout } = useUser();
+  // TODO: Replace with MySQL-based authentication
+  // For now, get user from localStorage or context
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isUserLoading, setIsUserLoading] = useState(true);
+  
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
   const hasShownLoginToast = useRef(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
+  useEffect(() => {
+    // TODO: Implement MySQL-based user authentication check
+    // For now, check if user data exists in sessionStorage
+    const userDataStr = sessionStorage.getItem('currentUser');
+    if (userDataStr) {
+      try {
+        setUserProfile(JSON.parse(userDataStr));
+      } catch (e) {
+        setUserProfile(null);
+      }
+    }
+    setIsUserLoading(false);
+  }, []);
+
   const navItems = useMemo(() => {
     if (!userProfile) return []; // Don't show nav items if not logged in
-    if (userProfile.role === 'Administration' || userProfile.role === 'Super Administration') {
-        return allNavItems.filter(item => item.role === 'Administration' || item.role === 'All');
+    if (userProfile.role === 'Super Administration') {
+        // Super Admins see all admin items plus Store Hours
+        return allNavItems.filter(item => item.role === 'Administration' || item.role === 'Super Administration' || item.role === 'All');
+    }
+    if (userProfile.role === 'Administration') {
+        // Regular admins see admin items but not Store Hours (Super Admin only)
+        return allNavItems.filter(item => (item.role === 'Administration' || item.role === 'All') && item.href !== '/store-hours');
     }
     if (userProfile.role === 'Sales') {
-        return allNavItems.filter(item => item.role === 'Sales' || item.role === 'All');
+        // Sales personnel ONLY see the Point of Sale option
+        return allNavItems.filter(item => item.href === '/pos');
     }
     return [];
   }, [userProfile]);
@@ -88,16 +120,17 @@ export default function DashboardLayout({
         hasShownLoginToast.current = true;
       }
       
-      const salesAllowedPaths = ['/pos', '/returns'];
-      // Redirect if role and path don't match
-      if (userProfile.role === 'Sales' && !salesAllowedPaths.includes(pathname)) {
+      // Sales personnel can ONLY access POS
+      if (userProfile.role === 'Sales' && pathname !== '/pos') {
         router.replace('/pos');
       }
     }
   }, [userProfile, isUserLoading, router, toast, pathname]);
 
   const handleLogout = async () => {
-    logout();
+    // TODO: Call logout API endpoint
+    sessionStorage.removeItem('currentUser');
+    setUserProfile(null);
     hasShownLoginToast.current = false;
     router.push('/login');
   };

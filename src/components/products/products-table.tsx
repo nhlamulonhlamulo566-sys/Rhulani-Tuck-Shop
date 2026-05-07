@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import { MoreHorizontal, PlusCircle, Loader2 } from 'lucide-react';
 import {
@@ -27,23 +27,22 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 import PageHeader from '@/components/page-header';
 import type { Product } from '@/lib/types';
+import { toMoney } from '@/lib/format-utils';
 import { ProductFormSheet } from './product-form-sheet';
-import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { useCollection } from '@/hooks/use-db-collection';
 
 export function ProductsTable() {
-  const firestore = useFirestore();
-  const productsQuery = useMemoFirebase(() => collection(firestore, 'products'), [firestore]);
-  const { data: products, isLoading } = useCollection<Product>(productsQuery);
-  
+  const { data: products, isLoading, error, refetch } = useCollection<Product>('/api/products');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const { toast } = useToast();
 
   const handleAddNew = () => {
     setEditingProduct(undefined);
@@ -55,25 +54,94 @@ export function ProductsTable() {
     setIsSheetOpen(true);
   };
 
-  const handleDelete = (productId: string) => {
-    const productRef = doc(firestore, 'products', productId);
-    deleteDocumentNonBlocking(productRef);
+  const handleDelete = async (productId: string) => {
+    try {
+      setDeletingProduct(null); // Close dialog immediately
+      const response = await fetch(`/api/products/${productId}`, {
+        method: 'DELETE',
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to delete product');
+      }
+
+      toast({
+        title: 'Success',
+        description: payload?.message || 'Product deleted successfully',
+      });
+      refetch();
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to delete product',
+      });
+    }
   };
   
-  const handleSave = (data: any, currentProduct?: Product) => {
-    if(currentProduct) {
-      const productRef = doc(firestore, 'products', currentProduct.id);
-      updateDocumentNonBlocking(productRef, data);
-    } else {
-      const newProductData = {
-        imageUrl: data.imageUrl || `https://picsum.photos/seed/${Date.now()}/600/400`,
-        imageHint: data.name.split(' ').slice(0, 2).join(' ') || 'product',
-        ...data
-      };
-      const productsCollection = collection(firestore, 'products');
-      addDocumentNonBlocking(productsCollection, newProductData);
+  const handleSave = async (data: any, currentProduct?: Product) => {
+    try {
+      if (currentProduct) {
+        const payloadToUpdate = {
+          ...data,
+          imageHint:
+            currentProduct.imageHint || data.name.split(' ').slice(0, 2).join(' ') || 'product',
+        };
+
+        const response = await fetch(`/api/products/${currentProduct.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payloadToUpdate),
+        });
+
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.error || 'Failed to update product');
+        }
+
+        toast({
+          title: 'Success',
+          description: payload?.message || 'Product updated successfully',
+        });
+      } else {
+        const newProductData = {
+          imageUrl: data.imageUrl || `https://picsum.photos/seed/${Date.now()}/600/400`,
+          imageHint: data.name.split(' ').slice(0, 2).join(' ') || 'product',
+          ...data,
+        };
+
+        const response = await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newProductData),
+        });
+
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.error || 'Failed to create product');
+        }
+
+        toast({
+          title: 'Success',
+          description: payload?.message || 'Product created successfully',
+        });
+      }
+
+      refetch();
+      setIsSheetOpen(false);
+      return true;
+    } catch (error: any) {
+      console.error('Save error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'An error occurred',
+      });
+      return false;
     }
-  }
+  };
 
   const getStockStatus = (product: Product) => {
     if (product.stock === 0) return 'Out of Stock';
@@ -138,7 +206,7 @@ export function ProductsTable() {
                    <Badge variant={getBadgeVariant(product)}>{getStockStatus(product)}</Badge>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">{product.stock}</TableCell>
-                <TableCell>R{product.price.toFixed(2)}</TableCell>
+                <TableCell>R{toMoney(product.price)}</TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -150,26 +218,9 @@ export function ProductsTable() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
                       <DropdownMenuItem onSelect={() => handleEdit(product)}>Edit</DropdownMenuItem>
-                      <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                              <button className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 text-red-600 w-full">
-                                  Delete
-                              </button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                              <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the product
-                                  and remove its data from our servers.
-                              </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(product.id)}>Delete</AlertDialogAction>
-                              </AlertDialogFooter>
-                          </AlertDialogContent>
-                      </AlertDialog>
+                      <DropdownMenuItem onSelect={() => setDeletingProduct(product)} className="text-destructive">
+                        Delete
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -184,6 +235,23 @@ export function ProductsTable() {
         product={editingProduct}
         onSave={handleSave}
       />
+
+      <AlertDialog open={!!deletingProduct} onOpenChange={(open) => { if (!open) setDeletingProduct(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete product?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The product will be removed from inventory.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deletingProduct && handleDelete(deletingProduct.id)}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

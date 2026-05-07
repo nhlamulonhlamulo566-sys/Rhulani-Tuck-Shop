@@ -47,28 +47,33 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useCollection } from '@/hooks/use-db-collection';
 import { useToast } from '@/hooks/use-toast';
-import { doc, collection, setDoc, getDocs, query, where, deleteDoc } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
 
 export default function SettingsPage() {
-  const firestore = useFirestore();
-  const { user: adminUser } = useUser();
   const { toast } = useToast();
+  const [adminUser, setAdminUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
 
   const [firstName, setFirstName] = useState('');
   const [surname, setSurname] = useState('');
-  const [email, setEmail] = useState('');
+  const [workNumber, setWorkNumber] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<'Administration' | 'Sales' | 'Super Administration' | ''>('');
   const [pin, setPin] = useState('');
   
-  const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
-  const { data: users, isLoading: usersLoading, error: usersError } = useCollection<UserProfile>(usersQuery);
+  const { data: users, isLoading: usersLoading, error: usersError, refetch } = useCollection<UserProfile>('/api/users');
+
+  // Initialize admin user from session
+  useEffect(() => {
+    const user = sessionStorage.getItem('currentUser');
+    if (user) {
+      setAdminUser(JSON.parse(user));
+    }
+  }, []);
 
   const canManageSuperAdmins = adminUser?.role === 'Super Administration';
   const isAdminRole = role === 'Administration' || role === 'Super Administration';
@@ -77,7 +82,7 @@ export default function SettingsPage() {
     if (editingUser) {
         setFirstName(editingUser.firstName);
         setSurname(editingUser.lastName);
-        setEmail(editingUser.email);
+        setWorkNumber(editingUser.workNumber);
         setRole(editingUser.role);
         setPin(editingUser.pin || '');
         setPassword('');
@@ -91,7 +96,7 @@ export default function SettingsPage() {
     setEditingUser(null);
     setFirstName('');
     setSurname('');
-    setEmail('');
+    setWorkNumber('');
     setPassword('');
     setConfirmPassword('');
     setRole('');
@@ -119,11 +124,34 @@ export default function SettingsPage() {
         return;
       }
       
-      const pinQuery = query(collection(firestore, 'users'), where('pin', '==', pin));
-      const pinSnapshot = await getDocs(pinQuery);
-      const pinExists = !pinSnapshot.empty && pinSnapshot.docs[0].id !== editingUser?.id;
+      const pinExists = users?.some(u => u.pin === pin && u.id !== editingUser?.id);
       if (pinExists) {
         toast({ variant: 'destructive', title: 'PIN already in use', description: 'Please choose a unique 6-digit PIN.' });
+        return;
+      }
+    }
+
+    // PERMISSION CHECKS
+    // Only Super Administrators can create or edit Administrators or Super Administrators
+    if (!editingUser && (role === 'Administration' || role === 'Super Administration')) {
+      if (!canManageSuperAdmins) {
+        toast({ 
+          variant: "destructive", 
+          title: "Permission Denied", 
+          description: "Only Super Administrators can create Administrator accounts." 
+        });
+        return;
+      }
+    }
+
+    // When editing: prevent non-super-admins from changing role OR editing admin accounts
+    if (editingUser && editingUser.role !== 'Sales') {
+      if (!canManageSuperAdmins) {
+        toast({ 
+          variant: "destructive", 
+          title: "Permission Denied", 
+          description: "Only Super Administrators can edit Administrator accounts." 
+        });
         return;
       }
     }
@@ -141,38 +169,58 @@ export default function SettingsPage() {
 
     try {
         if (editingUser) {
-            const userRef = doc(firestore, 'users', editingUser.id);
-            await setDoc(userRef, {
-                firstName,
-                lastName: surname,
-                role,
-                pin: isAdminRole ? pin : '',
-            }, { merge: true });
-             toast({ title: "User Updated" });
-            clearForm();
-        } else { // Create new user
-            const usersRef = collection(firestore, 'users');
-            const q = query(usersRef, where("email", "==", email));
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-                throw new Error("A user with this email already exists.");
-            }
-
-            const newUserRef = doc(collection(firestore, 'users'));
-            await setDoc(newUserRef, {
-              id: newUserRef.id,
+            const updateData: any = {
               firstName,
               lastName: surname,
-              email,
-              password,
+              workNumber,
+              email: editingUser.email || null,
               role,
-              pin: isAdminRole ? pin : '',
-              createdAt: new Date().toISOString(),
+              pin: isAdminRole ? pin : null,
+            };
+            if (password) {
+              updateData.password = password;
+            }
+            const response = await fetch(`/api/users/${editingUser.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(updateData),
             });
+
+            if (!response.ok) throw new Error('Failed to update user');
+
+            toast({ title: 'Success', description: 'User updated successfully' });
+            refetch();
+            clearForm();
+        } else { // Create new user
+            if (!/^[0-9]{8}$/.test(workNumber)) {
+              throw new Error('Work number must be exactly 8 digits.');
+            }
+
+            const workNumberExists = users?.some(u => u.workNumber === workNumber);
+            if (workNumberExists) {
+                throw new Error('A user with this work number already exists.');
+            }
+
+            const response = await fetch('/api/users', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                firstName,
+                lastName: surname,
+                workNumber,
+                password,
+                role,
+                pin: isAdminRole ? pin : null,
+              }),
+            });
+
+            if (!response.ok) throw new Error('Failed to create user');
 
             toast({
                 title: "User Created Successfully",
+                description: `${firstName} ${surname} has been added.`
             });
+            refetch();
             clearForm();
         }
     } catch (error: any) {
@@ -216,9 +264,18 @@ export default function SettingsPage() {
       }
       
       setIsLoading(true);
-      const userRef = doc(firestore, 'users', userId);
-      await deleteDoc(userRef);
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requesterId: adminUser?.id,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to delete user');
+
       toast({ title: "User Deleted", description: "The user's account has been permanently deleted." });
+      refetch();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -255,22 +312,20 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email (Username)</Label>
-                  <Input id="email" type="email" placeholder="user@example.com" value={email} onChange={e => setEmail(e.target.value)} required disabled={!!editingUser} />
+                  <Label htmlFor="workNumber">Work Number (Username)</Label>
+                  <Input id="workNumber" type="text" inputMode="numeric" pattern="[0-9]*" placeholder="12345678" value={workNumber} onChange={e => setWorkNumber(e.target.value.replace(/\D/g, ''))} required disabled={!!editingUser} maxLength={8} />
                 </div>
                 
-                {!editingUser && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="password">Password</Label>
-                            <Input id="password" type="password" placeholder="Enter password" value={password} onChange={e => setPassword(e.target.value)} required={!editingUser} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="confirmPassword">Confirm Password</Label>
-                            <Input id="confirmPassword" type="password" placeholder="Confirm password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required={!editingUser} />
-                        </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="password">{editingUser ? 'New Password (Optional)' : 'Password'}</Label>
+                        <Input id="password" type="password" placeholder={editingUser ? 'Leave blank to keep current' : 'Enter password'} value={password} onChange={e => setPassword(e.target.value)} required={!editingUser} />
                     </div>
-                )}
+                    <div className="space-y-2">
+                        <Label htmlFor="confirmPassword">{editingUser ? 'Confirm New Password' : 'Confirm Password'}</Label>
+                        <Input id="confirmPassword" type="password" placeholder={editingUser ? 'Leave blank if not changing' : 'Confirm password'} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required={!editingUser} />
+                    </div>
+                </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -281,10 +336,13 @@ export default function SettingsPage() {
                             </SelectTrigger>
                             <SelectContent>
                             <SelectItem value="Sales">Sales</SelectItem>
-                            <SelectItem value="Administration">Administration</SelectItem>
+                            {canManageSuperAdmins && <SelectItem value="Administration">Administration</SelectItem>}
                             {canManageSuperAdmins && <SelectItem value="Super Administration">Super Administration</SelectItem>}
                             </SelectContent>
                         </Select>
+                        {!canManageSuperAdmins && (
+                          <p className="text-xs text-muted-foreground">Only Sales users can be created. Contact a Super Administrator to create Admin accounts.</p>
+                        )}
                     </div>
                     {isAdminRole && (
                         <div className="space-y-2">
@@ -316,7 +374,7 @@ export default function SettingsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
+                    <TableHead>Work Number</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>
                       <span className="sr-only">Actions</span>
@@ -339,7 +397,7 @@ export default function SettingsPage() {
                   ) : (users?.map((u) => (
                     <TableRow key={u.id}>
                       <TableCell className="font-medium">{u.firstName} {u.lastName}</TableCell>
-                      <TableCell>{u.email}</TableCell>
+                      <TableCell>{u.workNumber}</TableCell>
                       <TableCell>
                         <Badge variant="secondary">{u.role}</Badge>
                       </TableCell>
@@ -365,7 +423,7 @@ export default function SettingsPage() {
                                     <AlertDialogHeader>
                                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        This action cannot be undone. This will permanently delete this user's account data.
+                                        This action cannot be undone. It will permanently delete the account data of the user.
                                     </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -398,13 +456,13 @@ export default function SettingsPage() {
               <div>
                 <h4 className="font-semibold">Administrator</h4>
                 <p className="text-sm text-muted-foreground">
-                  Manages daily operations. Can add and edit products, manage stock levels, oversee till sessions, and manage 'Sales' and other 'Administrator' users. Requires a unique PIN to authorize sensitive actions like transaction voids and returns.
+                  Manages daily operations. Can add and edit products, manage stock levels, oversee till sessions, and manage Sales and other Administrator users. Requires a unique PIN to authorize sensitive actions like transaction voids and returns.
                 </p>
               </div>
               <div>
                 <h4 className="font-semibold">Sales</h4>
                 <p className="text-sm text-muted-foreground">
-                  Focused on customer-facing transactions. This role has access to the Point of Sale (POS) system for processing sales and can initiate returns or voids, which must be authorized by an Administrator's PIN.
+                  Focused on customer-facing transactions. This role has access to the Point of Sale (POS) system for processing sales and can initiate returns or voids, which must be authorized by an Administrator PIN.
                 </p>
               </div>
             </CardContent>

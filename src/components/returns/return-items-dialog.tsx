@@ -84,6 +84,7 @@ export function ReturnItemsDialog({ sale, isOpen, onClose, onConfirm }: ReturnIt
       .map(([productId, quantity]) => ({ productId, quantity }));
       
     onConfirm(returnedItems);
+    // Don't close here - let the parent close it after the async operation completes
   };
 
   const handleDialogClose = () => {

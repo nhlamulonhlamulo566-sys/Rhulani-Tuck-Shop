@@ -1,20 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Sale } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Printer, Download, X } from 'lucide-react';
 import { formatCardReceipt } from '@/lib/card-payment';
+import { printReceiptHTML } from '@/lib/receipt-printing';
 
 interface CardReceiptProps {
   transaction: Sale;
   isOpen?: boolean;
   onClose?: () => void;
+  autoPrint?: boolean;
+  autoPrintDelay?: number;
 }
 
-export function CardReceipt({ transaction, isOpen = true, onClose }: CardReceiptProps) {
+export function CardReceipt({ transaction, isOpen = true, onClose, autoPrint = false, autoPrintDelay = 1500 }: CardReceiptProps) {
   const [isPrinting, setIsPrinting] = useState(false);
 
   const formatCurrency = (amount: number) => {
@@ -32,42 +35,7 @@ export function CardReceipt({ transaction, isOpen = true, onClose }: CardReceipt
     });
   };
 
-  const handlePrint = () => {
-    setIsPrinting(true);
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      const receiptContent = getReceiptHTML();
-      printWindow.document.write(receiptContent);
-      printWindow.document.close();
-      printWindow.onload = () => {
-        printWindow.print();
-        setIsPrinting(false);
-      };
-    }
-  };
-
-  const handleDownload = () => {
-    const receiptText = formatCardReceipt(
-      {
-        success: transaction.status === 'Completed',
-        transactionId: transaction.cardTransactionId,
-        amount: transaction.total,
-        currency: 'ZAR',
-        timestamp: transaction.date,
-        method: 'card',
-      },
-      'Rhulani Tuck Shop'
-    );
-
-    const blob = new Blob([receiptText], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `receipt-${transaction.cardTransactionId}.txt`;
-    a.click();
-  };
-
-  const getReceiptHTML = () => {
+  const getReceiptHTML = useCallback(() => {
     return `
       <!DOCTYPE html>
       <html>
@@ -144,6 +112,41 @@ export function CardReceipt({ transaction, isOpen = true, onClose }: CardReceipt
       </body>
       </html>
     `;
+  }, [transaction]);
+
+  const handlePrint = () => {
+    setIsPrinting(true);
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      const receiptContent = getReceiptHTML();
+      printWindow.document.write(receiptContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+        setIsPrinting(false);
+      };
+    }
+  };
+
+  const handleDownload = () => {
+    const receiptText = formatCardReceipt(
+      {
+        success: transaction.status === 'Completed',
+        transactionId: transaction.cardTransactionId,
+        amount: transaction.total,
+        currency: 'ZAR',
+        timestamp: transaction.date,
+        method: 'card',
+      },
+      'Rhulani Tuck Shop'
+    );
+
+    const blob = new Blob([receiptText], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `receipt-${transaction.cardTransactionId}.txt`;
+    a.click();
   };
 
   if (!isOpen) return null;

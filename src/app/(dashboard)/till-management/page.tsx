@@ -16,10 +16,10 @@ import { Loader2, Landmark, CheckCircle, AlertTriangle, User, Ban, Undo2, Users 
 import { useToast } from '@/hooks/use-toast';
 import type { Sale, TillSession, UserProfile } from '@/lib/types';
 import { format, startOfToday, startOfWeek, startOfMonth, endOfToday, endOfWeek, endOfMonth, isWithinInterval } from 'date-fns';
-import { useFirestore, useUser, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, query, where, orderBy, doc, limit } from 'firebase/firestore';
+import { useCollection } from '@/hooks/use-db-collection';
 import PageHeader from '@/components/page-header';
 import { Separator } from '@/components/ui/separator';
+import { toMoney } from '@/lib/format-utils';
 import {
   Accordion,
   AccordionContent,
@@ -74,7 +74,7 @@ const ActiveSessionCard = ({ session, sales, onEndSession }: { session: TillSess
             </CardHeader>
             <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <StatCard title="Opening Balance" value={`R${session.openingBalance.toFixed(2)}`} icon={Landmark} />
+                    <StatCard title="Opening Balance" value={`R${Number(session.openingBalance).toFixed(2)}`} icon={Landmark} />
                     <StatCard title="Cash Sales Today" value={`R${cashSales.toFixed(2)}`} icon={Landmark} />
                 </div>
                 <Separator />
@@ -193,7 +193,7 @@ const emptyPeriodTotals: PeriodTotals = {
 const StatDisplay = ({ title, amount }: { title: string; amount: number }) => (
   <div className="flex justify-between items-center text-sm">
     <p className="text-muted-foreground">{title}</p>
-    <p className="font-medium">R{amount.toFixed(2)}</p>
+    <p className="font-medium">R{toMoney(amount)}</p>
   </div>
 );
 
@@ -210,7 +210,7 @@ const TotalsCard = ({ title, stats }: { title: string; stats: PaymentStats }) =>
       <Separator />
       <div className="flex justify-between font-bold text-lg">
         <span>Net Sales</span>
-        <span>R{stats.total.toFixed(2)}</span>
+        <span>R{toMoney(stats.total)}</span>
       </div>
     </CardContent>
   </Card>
@@ -225,7 +225,7 @@ const AdjustmentCard = ({ title, amount, icon: Icon }: { title: string; amount: 
       </CardTitle>
     </CardHeader>
     <CardContent>
-      <p className="text-2xl font-bold">R{amount.toFixed(2)}</p>
+      <p className="text-2xl font-bold">R{toMoney(amount)}</p>
       <p className="text-xs text-muted-foreground">Total value for this period</p>
     </CardContent>
   </Card>
@@ -244,37 +244,30 @@ const PeriodSection = ({ title, stats }: { title: string; stats: PaymentStats })
 
 
 export default function TillManagementPage() {
-    const firestore = useFirestore();
-    const { user } = useUser();
     const { toast } = useToast();
+    const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+    
+    // Initialize user from session
+    useState(() => {
+      const user = sessionStorage.getItem('currentUser');
+      if (user) {
+        setCurrentUser(JSON.parse(user));
+      }
+    });
     
     // --- Data Fetching ---
-    const activeSessionsQuery = useMemoFirebase(() => {
-        if (!user) return null;
-        return query(
-          collection(firestore, 'tillSessions'),
-          where('status', '==', 'Active'),
-        );
-      }, [firestore, user]
-    );
-    const { data: activeSessions, isLoading: sessionLoading } = useCollection<TillSession>(activeSessionsQuery);
+    const { data: allTillRecords, isLoading: sessionLoading, error: sessionError, refetch: refetchTillRecords } = useCollection<any>('/api/till-management');
+    const { data: sales, isLoading: salesLoading, refetch: refetchSales } = useCollection<Sale>('/api/sales');
+    const { data: users, isLoading: usersLoading, refetch: refetchUsers } = useCollection<UserProfile>('/api/users');
 
-    const salesQuery = useMemoFirebase(() => {
-        if (!user) return null;
-        const startOfMonthDate = startOfMonth(new Date());
-        return query(collection(firestore, 'sales'), where('date', '>=', startOfMonthDate.toISOString()));
-    }, [firestore, user]);
-    const { data: sales, isLoading: salesLoading } = useCollection<Sale>(salesQuery);
-    
-    const historyQuery = useMemoFirebase(() => {
-        if (!user) return null;
-        return query(
-          collection(firestore, 'tillSessions'), 
-          where('status', '==', 'Closed')
-        );
-      }, [firestore, user]
-    );
-    const { data: historyUnsorted, isLoading: historyLoading, error: historyError } = useCollection<TillSession>(historyQuery);
+    // --- Client-side filtering ---
+    const activeSessions = useMemo(() => {
+      return (allTillRecords || []).filter(t => !t.endDate);
+    }, [allTillRecords]);
+
+    const historyUnsorted = useMemo(() => {
+      return (allTillRecords || []).filter(t => t.endDate);
+    }, [allTillRecords]);
     
     const history = useMemo(() => {
         if (!historyUnsorted) return null;
@@ -289,14 +282,6 @@ export default function TillManagementPage() {
             });
     }, [historyUnsorted]);
 
-    const usersQuery = useMemoFirebase(() => {
-        if (!user) return null;
-        return query(collection(firestore, 'users'))
-      },
-      [firestore, user]
-    );
-    const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);
-
     // --- User & Session Filtering Logic ---
     const salesUsers = useMemo(() => users?.filter(u => u.role === 'Sales') || [], [users]);
     const usersWithActiveSession = useMemo(() => activeSessions?.map(s => s.userId) || [], [activeSessions]);
@@ -305,8 +290,8 @@ export default function TillManagementPage() {
     }, [salesUsers, usersWithActiveSession]);
 
     // --- Till Management Logic ---
-    const handleStartSession = (openingBalance: number, selectedUserId: string) => {
-        if (!user) {
+    const handleStartSession = async (openingBalance: number, selectedUserId: string) => {
+        if (!currentUser) {
             toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in.' });
             return;
         }
@@ -321,19 +306,29 @@ export default function TillManagementPage() {
             return;
         }
 
-        const newSession = {
-            startDate: new Date().toISOString(),
-            openingBalance,
-            status: 'Active' as const,
-            userId: selectedUser.id,
-            userName: `${selectedUser.firstName} ${selectedUser.lastName}`
-        };
+        try {
+          const response = await fetch('/api/till-management', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: selectedUser.id,
+              openingBalance,
+              openedAt: new Date().toISOString(),
+            }),
+          });
 
-        addDocumentNonBlocking(collection(firestore, 'tillSessions'), newSession);
-        toast({ title: 'Success', description: `New till session started for ${selectedUser.firstName}.` });
+          if (!response.ok) throw new Error('Failed to start session');
+
+          toast({ title: 'Success', description: `Till session started for ${selectedUser.firstName} ${selectedUser.lastName}` });
+          
+          // Refresh the till records to show the new session
+          refetchTillRecords();
+        } catch (error: any) {
+          toast({ variant: 'destructive', title: 'Error', description: error.message });
+        }
     };
 
-    const handleEndSession = (sessionId: string, countedCash: number) => {
+    const handleEndSession = async (sessionId: string, countedCash: number) => {
         const sessionToEnd = activeSessions?.find(s => s.id === sessionId);
         if (!sessionToEnd || !sales) return;
 
@@ -343,23 +338,34 @@ export default function TillManagementPage() {
         }
         
         const cashSales = sales
-            .filter(sale => sale.paymentMethod === 'Cash' && new Date(sale.date) >= new Date(sessionToEnd.startDate))
+            .filter(sale => sale.paymentMethod === 'Cash' && new Date(sale.date) >= new Date(sessionToEnd.openedAt))
             .reduce((total, sale) => total + sale.total, 0);
         
         const expectedCash = sessionToEnd.openingBalance + cashSales;
         const difference = countedCash - expectedCash;
-        
-        const sessionRef = doc(firestore, 'tillSessions', sessionToEnd.id);
-        const updatedData = {
-            endDate: new Date().toISOString(),
-            status: 'Closed' as const,
-            expectedCash,
-            countedCash,
-            difference,
-        };
-        
-        updateDocumentNonBlocking(sessionRef, updatedData);
-        toast({ title: 'Session Closed', description: `Till for ${sessionToEnd.userName} has been cashed up.` });
+
+        try {
+          const response = await fetch(`/api/till-management/${sessionToEnd.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              closingBalance: countedCash,
+              closedAt: new Date().toISOString(),
+              expectedCash,
+              countedCash,
+              difference,
+            }),
+          });
+
+          if (!response.ok) throw new Error('Failed to close session');
+
+          toast({ title: 'Session Closed', description: `Till has been cashed up.` });
+          
+          // Refresh the till records to show the closed session
+          refetchTillRecords();
+        } catch (error: any) {
+          toast({ variant: 'destructive', title: 'Error', description: error.message });
+        }
     };
 
     // --- Cash-Up Logic ---
@@ -453,7 +459,7 @@ export default function TillManagementPage() {
     }, [salespersonTotals]);
 
 
-    const isLoading = sessionLoading || salesLoading || historyLoading || usersLoading;
+    const isLoading = sessionLoading || salesLoading || usersLoading;
 
     if (isLoading) {
       return (
@@ -509,12 +515,12 @@ export default function TillManagementPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-3">
-                                    {historyLoading ? (
+                                    {sessionLoading ? (
                                         <div className="flex justify-center items-center h-32">
                                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                         </div>
-                                    ) : historyError ? (
-                                        <p className="text-sm text-destructive text-center py-8">Error loading history: {historyError.message}</p>
+                                    ) : sessionError ? (
+                                        <p className="text-sm text-destructive text-center py-8">Error loading history: {sessionError.message}</p>
                                     ) : history && history.length > 0 ? (
                                         <div className="border rounded-lg">
                                             <div className="max-h-[500px] overflow-y-auto">
@@ -532,23 +538,23 @@ export default function TillManagementPage() {
                                                                 <p className="text-sm text-muted-foreground">Operator: <span className="font-medium text-foreground">{h.userName}</span></p>
                                                             </div>
                                                             <div className="text-right">
-                                                                <p className={`font-bold text-base ${(h.difference || 0) === 0 ? 'text-foreground' : (h.difference || 0) > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                                    {(h.difference || 0) === 0 ? '✓ Balanced' : (h.difference || 0) > 0 ? `+R${(h.difference || 0).toFixed(2)}` : `-R${Math.abs(h.difference || 0).toFixed(2)}`}
+                                                                <p className={`font-bold text-base ${Number(h.difference || 0) === 0 ? 'text-foreground' : Number(h.difference || 0) > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                                    {Number(h.difference || 0) === 0 ? '✓ Balanced' : Number(h.difference || 0) > 0 ? `+R${Number(h.difference || 0).toFixed(2)}` : `-R${Math.abs(Number(h.difference || 0)).toFixed(2)}`}
                                                                 </p>
                                                             </div>
                                                         </div>
                                                         <div className="grid grid-cols-3 gap-3 text-xs">
                                                             <div className="bg-background rounded p-2">
                                                                 <p className="text-muted-foreground">Opening</p>
-                                                                <p className="font-mono font-semibold">R{(h.openingBalance || 0).toFixed(2)}</p>
+                                                                <p className="font-mono font-semibold">R{Number(h.openingBalance || 0).toFixed(2)}</p>
                                                             </div>
                                                             <div className="bg-background rounded p-2">
                                                                 <p className="text-muted-foreground">Expected</p>
-                                                                <p className="font-mono font-semibold">R{(h.expectedCash || 0).toFixed(2)}</p>
+                                                                <p className="font-mono font-semibold">R{Number(h.expectedCash || 0).toFixed(2)}</p>
                                                             </div>
                                                             <div className="bg-background rounded p-2">
                                                                 <p className="text-muted-foreground">Counted</p>
-                                                                <p className="font-mono font-semibold">R{(h.countedCash || 0).toFixed(2)}</p>
+                                                                <p className="font-mono font-semibold">R{Number(h.countedCash || 0).toFixed(2)}</p>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -582,11 +588,11 @@ export default function TillManagementPage() {
                           </div>
                       </AccordionTrigger>
                       <AccordionContent className="p-6 pt-0 space-y-8">
-                          <PeriodSection title="Today's Summary" stats={salespersonTotals[salesperson].today} />
+                          <PeriodSection title="Summary for Today" stats={salespersonTotals[salesperson].today} />
                           <Separator />
-                          <PeriodSection title="This Week's Summary" stats={salespersonTotals[salesperson].thisWeek} />
+                          <PeriodSection title="Summary This Week" stats={salespersonTotals[salesperson].thisWeek} />
                           <Separator />
-                          <PeriodSection title="This Month's Summary" stats={salespersonTotals[salesperson].thisMonth} />
+                          <PeriodSection title="Summary This Month" stats={salespersonTotals[salesperson].thisMonth} />
                       </AccordionContent>
                       </AccordionItem>
                   ))}
@@ -604,11 +610,11 @@ export default function TillManagementPage() {
                         <CardDescription>A combined summary of all sales activity across all staff members.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-8">
-                        <PeriodSection title="Today's Grand Total" stats={grandTotals.today} />
+                        <PeriodSection title="Grand Total Today" stats={grandTotals.today} />
                         <Separator />
-                        <PeriodSection title="This Week's Grand Total" stats={grandTotals.thisWeek} />
+                        <PeriodSection title="Grand Total This Week" stats={grandTotals.thisWeek} />
                         <Separator />
-                        <PeriodSection title="This Month's Grand Total" stats={grandTotals.thisMonth} />
+                        <PeriodSection title="Grand Total This Month" stats={grandTotals.thisMonth} />
                     </CardContent>
                 </Card>
             </div>

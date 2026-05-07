@@ -11,8 +11,7 @@ import {
 } from '@/components/ui/table';
 import PageHeader from '@/components/page-header';
 import type { TillSession, Sale } from '@/lib/types';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useCollection } from '@/hooks/use-db-collection';
 import { Loader2, TrendingUp, TrendingDown, Minus, Landmark } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { format, startOfToday, endOfToday } from 'date-fns';
@@ -25,37 +24,29 @@ const formatCurrency = (amount: number | undefined) => {
 }
 
 export default function TillAuditsPage() {
-  const firestore = useFirestore();
+  const { data: allTillRecords, isLoading } = useCollection<TillSession>('/api/till-management');
+  const { data: allSales, isLoading: salesLoading } = useCollection<Sale>('/api/sales');
 
-  const sessionsQuery = useMemoFirebase(() => {
-    return query(
-      collection(firestore, 'tillSessions'),
-      where('status', '==', 'Closed')
-    );
-  }, [firestore]);
+  // Filter for closed sessions (those with endDate)
+  const sessionsUnsorted = useMemo(() => {
+    return (allTillRecords || []).filter(t => t.endDate);
+  }, [allTillRecords]);
 
-  const { data: sessionsUnsorted, isLoading } = useCollection<TillSession>(sessionsQuery);
-  
-  const salesQuery = useMemoFirebase(() => {
+  // Filter for today's completed sales
+  const todaySales = useMemo(() => {
+    if (!allSales) return [];
     const today = startOfToday();
     const endOfTodayDate = endOfToday();
-    return query(
-      collection(firestore, 'sales'),
-      where('date', '>=', today.toISOString()),
-      where('date', '<=', endOfTodayDate.toISOString())
-    );
-  }, [firestore]);
+    return allSales.filter(sale => {
+      const saleDate = new Date(sale.date);
+      return sale.status === 'Completed' && 
+             saleDate >= today && 
+             saleDate <= endOfTodayDate;
+    });
+  }, [allSales]);
 
-  const { data: allTodaySales, isLoading: salesLoading } = useCollection<Sale>(salesQuery);
-  
-  // Filter for completed and withdrawal transactions
-  const todaySales = useMemo(() => {
-    if (!allTodaySales) return [];
-    return allTodaySales.filter(sale => sale.status === 'Completed' || sale.status === 'Withdrawal' || sale.transactionType === 'withdrawal');
-  }, [allTodaySales]);
-  
   const sessions = useMemo(() => {
-    if (!sessionsUnsorted) return null;
+    if (!sessionsUnsorted) return [];
     return [...sessionsUnsorted].sort((a, b) => {
       const aDate = a.endDate ? new Date(a.endDate).getTime() : 0;
       const bDate = b.endDate ? new Date(b.endDate).getTime() : 0;
@@ -65,19 +56,17 @@ export default function TillAuditsPage() {
 
   const salesBySalesperson = useMemo(() => {
     if (!todaySales) return {};
-    const summary: Record<string, { netSales: number; count: number; cashSales: number; cardSales: number; withdrawals: number }> = {};
+    const summary: Record<string, { netSales: number; count: number; cashSales: number; cardSales: number }> = {};
     
     todaySales.forEach(sale => {
       if (!summary[sale.salesperson]) {
-        summary[sale.salesperson] = { netSales: 0, count: 0, cashSales: 0, cardSales: 0, withdrawals: 0 };
+        summary[sale.salesperson] = { netSales: 0, count: 0, cashSales: 0, cardSales: 0 };
       }
       summary[sale.salesperson].netSales += sale.total;
       summary[sale.salesperson].count += 1;
       
-      // Track cash, card, and withdrawals separately
-      if (sale.status === 'Withdrawal' || sale.transactionType === 'withdrawal') {
-        summary[sale.salesperson].withdrawals += Math.abs(sale.total); // withdrawals are negative, so abs them for tracking
-      } else if (sale.paymentMethod === 'Card') {
+      // Track cash and card separately
+      if (sale.paymentMethod === 'Card') {
         summary[sale.salesperson].cardSales += sale.total;
       } else {
         summary[sale.salesperson].cashSales += sale.total;
@@ -198,7 +187,6 @@ export default function TillAuditsPage() {
                     <TableHead className="text-right">Opening Float</TableHead>
                     <TableHead className="text-right">Cash Sales</TableHead>
                     <TableHead className="text-right">Card Sales</TableHead>
-                    <TableHead className="text-right">Withdrawals</TableHead>
                     <TableHead className="text-right">Expected Cash</TableHead>
                     <TableHead className="text-right">Counted Cash</TableHead>
                     <TableHead className="text-right">Difference</TableHead>
@@ -213,10 +201,16 @@ export default function TillAuditsPage() {
                     </TableRow>
                   ) : sessions && sessions.length > 0 ? (
                     sessions.map((session, idx) => {
-                      const salespersonData = salesBySalesperson[session.userName];
+                      // Use the userId to find matching salesperson data
+                      const matchingSalesperson = Object.entries(salesBySalesperson).find(([name]) => {
+                        // Try to match by finding the salesperson in today's sales
+                        const salespersonFromSales = todaySales.find(s => s.userId === session.userId)?.salesperson;
+                        return salespersonFromSales === name;
+                      });
+                      
+                      const salespersonData = matchingSalesperson ? matchingSalesperson[1] : undefined;
                       const cashSales = salespersonData?.cashSales || 0;
                       const cardSales = salespersonData?.cardSales || 0;
-                      const withdrawals = salespersonData?.withdrawals || 0;
                       const calculatedExpectedCash = getExpectedCashWithTodaySales(session);
                       const calculatedDifference = (session.countedCash || 0) - calculatedExpectedCash;
                       return (
@@ -227,11 +221,10 @@ export default function TillAuditsPage() {
                               <p className="text-xs text-muted-foreground">{session.endDate ? format(new Date(session.endDate), 'p') : ''}</p>
                             </div>
                           </TableCell>
-                          <TableCell className="font-medium">{session.userName}</TableCell>
+                          <TableCell className="font-medium">Salesperson</TableCell>
                           <TableCell className="text-right font-mono text-sm">{formatCurrency(session.openingBalance)}</TableCell>
                           <TableCell className="text-right font-mono text-sm">{formatCurrency(cashSales)}</TableCell>
                           <TableCell className="text-right font-mono text-sm text-blue-600">{formatCurrency(cardSales)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm text-amber-600">{formatCurrency(withdrawals)}</TableCell>
                           <TableCell>
                             <div className="text-right">
                               <p className="font-mono text-sm">{formatCurrency(calculatedExpectedCash)}</p>

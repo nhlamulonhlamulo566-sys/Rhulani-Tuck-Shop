@@ -6,63 +6,82 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useUser, useFirestore } from "@/firebase" 
+// import { useUser, useFirestore } from "@/firebase" // Removed Firebase
 import { Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { collection, query, where, getDocs } from "firebase/firestore"
+// import { collection, query, where, getDocs } from "firebase/firestore" // Removed Firebase
 import type { UserProfile } from "@/lib/types"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [workNumber, setWorkNumber] = useState('');
   const [password, setPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const firestore = useFirestore();
-  const { user, isUserLoading, login } = useUser();
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [isUserLoading, setIsUserLoading] = useState(true);
+  
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user && !isUserLoading) {
-      router.push('/dashboard');
+    // Check if user already logged in
+    const userDataStr = sessionStorage.getItem('currentUser');
+    if (userDataStr) {
+      try {
+        setUser(JSON.parse(userDataStr));
+        setIsUserLoading(false);
+        router.push('/dashboard');
+      } catch (e) {
+        setIsUserLoading(false);
+      }
+    } else {
+      setIsUserLoading(false);
     }
-  }, [user, isUserLoading, router]);
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
+    if (!/^[0-9]{8}$/.test(workNumber) || !password) {
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: "Please enter your email and password.",
+        description: "Please enter an 8-digit work number and password.",
       });
       return;
     }
     setIsLoggingIn(true);
     try {
-      const usersRef = collection(firestore, "users");
-      const q = query(usersRef, where("email", "==", email));
-      const querySnapshot = await getDocs(q);
+      // Call MySQL API endpoint for login using work number
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workNumber, password })
+      });
 
-      if (querySnapshot.empty) {
+      if (!response.ok) {
         throw new Error("Invalid credentials");
       }
 
-      const userDoc = querySnapshot.docs[0];
-      const userData = userDoc.data() as UserProfile;
-
-      if (userData.password !== password) {
-        throw new Error("Invalid credentials");
-      }
+      const data = await response.json();
+      const userData: UserProfile = data.user;
       
-      login({ ...userData, id: userDoc.id });
-      // The useEffect will handle the redirect on the next render.
+      // Store user in sessionStorage
+      sessionStorage.setItem('currentUser', JSON.stringify(userData));
+      setUser(userData);
+      
+      toast({
+        title: "Login Successful",
+        description: `Welcome, ${userData.firstName}!`,
+      });
+      
+      router.push('/dashboard');
 
     } catch (error: any) {
        toast({
             variant: "destructive",
             title: "Login Failed",
-            description: "Invalid email or password. Please try again.",
+            description: "Invalid work number or password. Please try again.",
         });
+       setWorkNumber('');
        setPassword('');
     } finally {
         setIsLoggingIn(false);
@@ -88,14 +107,17 @@ export default function LoginPage() {
           <form onSubmit={handleLogin}>
             <div className="grid gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="workNumber">Work Number</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
+                  id="workNumber"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Enter 8-digit work number"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  maxLength={8}
+                  value={workNumber}
+                  onChange={(e) => setWorkNumber(e.target.value.replace(/\D/g, ''))}
                   disabled={isLoggingIn}
                 />
               </div>
@@ -114,7 +136,7 @@ export default function LoginPage() {
                 {isLoggingIn ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Login'}
               </Button>
               <div className="mt-4 text-center text-sm">
-                Don't have an account? Please ask your manager or supervisor to create one for you.
+                Do not have an account? Please ask your manager or supervisor to create one for you.
               </div>
             </div>
           </form>

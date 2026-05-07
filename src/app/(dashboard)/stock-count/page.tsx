@@ -5,8 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Check } from 'lucide-react';
 import PageHeader from '@/components/page-header';
 import { StockTable } from '@/components/stock/stock-table';
-import { useFirestore, updateDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { Product } from '@/lib/types';
 
@@ -16,7 +14,6 @@ type StockCount = {
 };
 
 export default function StockCountPage() {
-  const firestore = useFirestore();
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
   const [stockCounts, setStockCounts] = useState<StockCount[]>([]);
@@ -33,7 +30,7 @@ export default function StockCountPage() {
     });
   };
 
-  const handleUpdateStock = () => {
+  const handleUpdateStock = async () => {
     setIsUpdating(true);
     try {
       const updates = stockCounts.filter(
@@ -45,27 +42,35 @@ export default function StockCountPage() {
           title: 'No Changes to Update',
           description: 'You have not entered any new stock counts.',
         });
+        setIsUpdating(false);
         return;
       }
 
-      updates.forEach((item) => {
-        const productRef = doc(firestore, 'products', item.productId);
-        updateDocumentNonBlocking(productRef, { stock: item.physicalCount });
-      });
+      for (const item of updates) {
+        const response = await fetch(`/api/products/${item.productId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stock: item.physicalCount }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update stock');
+        }
+      }
 
       toast({
-        title: 'Stock Update Initiated',
-        description: `${updates.length} product(s) are being updated in the background.`,
+        title: 'Success',
+        description: `${updates.length} product(s) have been updated successfully.`,
       });
       
       // Reset counts after updating
       setStockCounts([]);
 
-    } catch (error) {
+    } catch (error: any) {
        toast({
         variant: 'destructive',
         title: 'Update Failed',
-        description: 'An unexpected error occurred while updating stock.',
+        description: error.message || 'An unexpected error occurred while updating stock.',
       });
     } finally {
         setIsUpdating(false);

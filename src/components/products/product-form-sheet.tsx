@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/sheet';
 import { Upload } from 'lucide-react';
 import type { Product } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 const productFormSchema = z.object({
   name: z.string().min(2, 'Product name must be at least 2 characters.'),
@@ -50,7 +51,7 @@ interface ProductFormSheetProps {
   product?: Product;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (data: ProductFormValues, currentProduct?: Product) => void;
+  onSave: (data: ProductFormValues, currentProduct?: Product) => Promise<boolean>;
 }
 
 const getInitialValues = (product?: Product): ProductFormValues => {
@@ -61,8 +62,8 @@ const getInitialValues = (product?: Product): ProductFormValues => {
           price: product.price,
           stock: product.stock,
           lowStockThreshold: product.lowStockThreshold,
-          description: product.description,
-          imageUrl: product.imageUrl,
+          description: product.description ?? '',
+          imageUrl: product.imageUrl ?? '',
           barcode: product.barcode || '',
           barcodePack: product.barcodePack || '',
           packSize: product.packSize ?? 0,
@@ -88,6 +89,7 @@ const getInitialValues = (product?: Product): ProductFormValues => {
 export function ProductFormSheet({ product, open, onOpenChange, onSave }: ProductFormSheetProps) {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
@@ -97,7 +99,7 @@ export function ProductFormSheet({ product, open, onOpenChange, onSave }: Produc
   useEffect(() => {
     if (open) {
       const initialValues = getInitialValues(product);
-      form.reset(initialValues);
+      form.reset(initialValues, { keepDefaultValues: false });
       setImagePreview(initialValues.imageUrl || null);
     }
   }, [open, product, form]);
@@ -110,15 +112,34 @@ export function ProductFormSheet({ product, open, onOpenChange, onSave }: Produc
       reader.onloadend = () => {
         const dataUrl = reader.result as string;
         setImagePreview(dataUrl);
-        form.setValue('imageUrl', dataUrl, { shouldValidate: true });
+        form.setValue('imageUrl', dataUrl, { shouldValidate: false });
+      };
+      reader.onerror = () => {
+        console.error('Error reading file');
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to read image file',
+        });
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const onSubmit = (data: ProductFormValues) => {
-    onSave(data, product);
-    handleOpenChange(false);
+  const onSubmit = async (data: ProductFormValues) => {
+    try {
+      const wasSaved = await onSave(data, product);
+      if (wasSaved) {
+        handleOpenChange(false);
+      }
+    } catch (error) {
+      console.error('Error saving product:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to save product',
+      });
+    }
   };
   
   const handleOpenChange = (isOpen: boolean) => {
@@ -328,9 +349,13 @@ export function ProductFormSheet({ product, open, onOpenChange, onSave }: Produc
             
             <SheetFooter>
                 <SheetClose asChild>
-                    <Button type="button" variant="secondary">Cancel</Button>
+                    <Button type="button" variant="secondary" disabled={form.formState.isSubmitting}>
+                      Cancel
+                    </Button>
                 </SheetClose>
-                <Button type="submit">Save Product</Button>
+                <Button type="submit" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? 'Saving...' : 'Save Product'}
+                </Button>
             </SheetFooter>
           </form>
         </Form>

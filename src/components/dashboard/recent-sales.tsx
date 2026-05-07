@@ -2,8 +2,7 @@
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { useCollection } from '@/hooks/use-db-collection';
 import type { Sale, Product } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
@@ -16,27 +15,25 @@ interface RecentSalesProps {
 }
 
 export function RecentSales({ products }: RecentSalesProps) {
-  const firestore = useFirestore();
+  // Fetch all sales from MySQL API
+  const { data: allSales, isLoading } = useCollection<Sale>('/api/sales');
 
-  const salesQuery = useMemoFirebase(() => {
+  // Filter for current month's sales
+  const recentSales = useMemo(() => {
+    if (!allSales) return [];
+    
     const now = new Date();
     const start = startOfMonth(now);
     const end = endOfMonth(now);
     
-    return query(
-      collection(firestore, 'sales'),
-      where('date', '>=', start.toISOString()),
-      where('date', '<=', end.toISOString()),
-      orderBy('date', 'desc')
-    );
-  }, [firestore]);
-  
-  const { data: monthlySales, isLoading } = useCollection<Sale>(salesQuery);
-
-  const recentSales = useMemo(() => {
-    if (!monthlySales) return [];
-    return monthlySales.filter(sale => sale.status === 'Completed' || sale.status === 'Partially Returned');
-  }, [monthlySales]);
+    return allSales
+      .filter(sale => {
+        const saleDate = new Date(sale.date);
+        return saleDate >= start && saleDate <= end && (sale.status === 'Completed' || sale.status === 'Partially Returned');
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5);
+  }, [allSales]);
 
   const getProductImage = (productId: string) => {
     const product = products?.find(p => p.id === productId);
@@ -46,7 +43,7 @@ export function RecentSales({ products }: RecentSalesProps) {
   return (
     <Card className="flex flex-col h-full">
       <CardHeader>
-        <CardTitle>This Month's Sales</CardTitle>
+        <CardTitle>Sales This Month</CardTitle>
         <CardDescription>All valid sales recorded this month.</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 min-h-0 p-0">
@@ -75,7 +72,7 @@ export function RecentSales({ products }: RecentSalesProps) {
                         {firstItem?.name}{(sale.items && sale.items.length > 1) ? ` & ${sale.items.length - 1} more` : ''}
                     </p>
                     </div>
-                    <div className="ml-auto font-medium">+R{sale.total.toFixed(2)}</div>
+                    <div className="ml-auto font-medium">+R{Number(sale.total).toFixed(2)}</div>
                 </div>
                 );
             })
