@@ -1,6 +1,7 @@
 import type {Metadata} from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
+import ServiceWorkerCleanup from '@/components/service-worker-cleanup';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -24,6 +25,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#f9fafb" />
       </head>
       <body className={`${inter.className} min-h-screen bg-background`}>
+        <ServiceWorkerCleanup />
         {children}
       </body>
     </html>
