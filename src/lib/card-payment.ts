@@ -83,12 +83,16 @@ export async function processCardPayment(
  */
 export async function checkCardMachineStatus(provider: string = 'local'): Promise<CardMachineStatus> {
   try {
+    // Simulate checking card machine connection
+    // In a real implementation, this would check actual hardware status
+    const isConnected = Math.random() > 0.3; // 70% chance of being connected for testing
+    
     return {
-      isConnected: true,
+      isConnected: isConnected,
       provider: 'local',
       lastCheckTime: new Date().toISOString(),
-      batteryLevel: 100,
-      signalStrength: 5,
+      batteryLevel: isConnected ? Math.floor(Math.random() * 100) : undefined,
+      signalStrength: isConnected ? Math.floor(Math.random() * 5) + 1 : undefined,
     };
   } catch (error) {
     return {

@@ -2,9 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import PageHeader from '@/components/page-header';
-import { useFirestore, useCollection, useUser } from '@/firebase';
 import type { Sale } from '@/lib/types';
-import { collection, query, where, orderBy } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,34 +25,36 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { CreditCard, Download, Eye, Loader2, TrendingUp, AlertTriangle } from 'lucide-react';
+import { useCollection } from '@/hooks/use-db-collection';
 
 interface CardTransactionDetail extends Sale {
   salePerson?: string;
 }
 
 export default function CardTransactionsPage() {
-  const firestore = useFirestore();
-  const { user } = useUser();
   const [selectedTransaction, setSelectedTransaction] = useState<CardTransactionDetail | null>(null);
   const [searchId, setSearchId] = useState('');
   const [dateFilter, setDateFilter] = useState('all'); // all, today, week, month
 
-  // Query all sales with card transactions
-  const cardsQuery = useMemo(() => {
-    if (!user) return null;
-    return query(
-      collection(firestore, 'sales'),
-      where('cardTransactionId', '!=', null),
-      orderBy('cardTransactionId'),
-      orderBy('date', 'desc')
-    );
-  }, [firestore, user]);
-
-  const { data: cardTransactions = [], isLoading } = useCollection<Sale>(cardsQuery);
+  // Fetch all sales
+  const { data: allSales = [], isLoading } = useCollection<Sale>('/api/sales');
 
   // Filter and calculate statistics
   const stats = useMemo(() => {
-    let filtered = (cardTransactions || []).filter(tx => tx.cardTransactionId);
+    let filtered = (allSales || []).filter(tx => tx.paymentMethod === 'Card');
+
+    // Apply date filter
+    const filterNow = new Date();
+    if (dateFilter === 'today') {
+      const today = new Date(filterNow.getFullYear(), filterNow.getMonth(), filterNow.getDate());
+      filtered = filtered.filter(tx => new Date(tx.date) >= today);
+    } else if (dateFilter === 'week') {
+      const weekAgo = new Date(filterNow.getTime() - 7 * 24 * 60 * 60 * 1000);
+      filtered = filtered.filter(tx => new Date(tx.date) >= weekAgo);
+    } else if (dateFilter === 'month') {
+      const monthAgo = new Date(filterNow.getFullYear(), filterNow.getMonth() - 1, filterNow.getDate());
+      filtered = filtered.filter(tx => new Date(tx.date) >= monthAgo);
+    }
 
     // Apply date filter
     const now = new Date();
@@ -95,7 +95,7 @@ export default function CardTransactionsPage() {
       totalSalesCount: sales.length,
       totalWithdrawalsCount: withdrawals.length,
     };
-  }, [cardTransactions, searchId, dateFilter]);
+  }, [allSales, searchId, dateFilter]);
 
   const formatCurrency = (amount: number) => {
     return `R${Math.abs(amount).toFixed(2)}`;

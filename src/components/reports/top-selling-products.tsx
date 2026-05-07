@@ -12,11 +12,11 @@ import {
 } from '@/components/ui/table';
 import PageHeader from '@/components/page-header';
 import type { Sale, Product } from '@/lib/types';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
+import { toMoney } from '@/lib/format-utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { startOfMonth, endOfMonth } from 'date-fns';
+import { useCollection } from '@/hooks/use-db-collection';
 
 type ProductPerformance = {
   productId: string;
@@ -29,26 +29,15 @@ type ProductPerformance = {
 };
 
 export default function TopSellingProducts() {
-  const firestore = useFirestore();
-  
-  const salesQuery = useMemoFirebase(() => {
-    const now = new Date();
-    const start = startOfMonth(now);
-    const end = endOfMonth(now);
-    
-    return query(
-      collection(firestore, 'sales'),
-      where('date', '>=', start.toISOString()),
-      where('date', '<=', end.toISOString()),
-    );
-  }, [firestore]);
-  const { data: sales, isLoading: salesLoading } = useCollection<Sale>(salesQuery);
-  
-  const productsQuery = useMemoFirebase(() => collection(firestore, 'products'), [firestore]);
-  const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
+  const { data: sales, isLoading: salesLoading } = useCollection<Sale>('/api/sales');
+  const { data: products, isLoading: productsLoading } = useCollection<Product>('/api/products');
 
   const productPerformance = useMemo<ProductPerformance[]>(() => {
     if (!sales || !products) return [];
+
+    const now = new Date();
+    const start = startOfMonth(now);
+    const end = endOfMonth(now);
 
     const performanceMap = new Map<string, ProductPerformance>();
 
@@ -65,7 +54,12 @@ export default function TopSellingProducts() {
       });
     });
 
-    const validSales = sales.filter(s => s.status === 'Completed' || s.status === 'Partially Returned');
+    // Filter sales for current month
+    const validSales = sales.filter(s => {
+      const saleDate = new Date(s.date);
+      return (s.status === 'Completed' || s.status === 'Partially Returned') &&
+             saleDate >= start && saleDate <= end;
+    });
 
     validSales.forEach(sale => {
       if (sale.items) {
@@ -94,7 +88,7 @@ export default function TopSellingProducts() {
       <PageHeader title="Product Performance Report" />
       <Card>
         <CardHeader>
-            <CardTitle>This Month's Top Selling Products</CardTitle>
+            <CardTitle>Top Selling Products for This Month</CardTitle>
             <CardDescription>Products ranked by total units sold for the current month, adjusted for returns.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -134,7 +128,7 @@ export default function TopSellingProducts() {
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell>{product.category}</TableCell>
                         <TableCell className="text-right font-semibold">{product.totalSold}</TableCell>
-                        <TableCell className="text-right">R{product.totalRevenue.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">R{toMoney(product.totalRevenue)}</TableCell>
                     </TableRow>
                     ))) : (
                         <TableRow>

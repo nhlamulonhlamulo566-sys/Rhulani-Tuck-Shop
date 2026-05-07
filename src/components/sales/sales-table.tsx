@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { toMoney } from '@/lib/format-utils';
 import {
   Table,
   TableBody,
@@ -15,9 +16,8 @@ import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import type { Sale, UserProfile } from '@/lib/types';
 import { SaleDetailsModal } from './sale-details-modal';
-import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, where } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
+import { useCollection } from '@/hooks/use-db-collection';
 
 function SaleRow({ sale, onSelect }: { sale: Sale; onSelect: (sale: Sale) => void }) {
   
@@ -45,7 +45,7 @@ function SaleRow({ sale, onSelect }: { sale: Sale; onSelect: (sale: Sale) => voi
         {getStatusBadge(sale.status)}
       </TableCell>
       <TableCell>{(sale.items || []).reduce((sum, item) => sum + item.quantity, 0)}</TableCell>
-      <TableCell className="text-right">R{sale.total.toFixed(2)}</TableCell>
+      <TableCell className="text-right">R{toMoney(sale.total)}</TableCell>
       <TableCell className="text-right">
         <Button variant="outline" size="sm" onClick={() => onSelect(sale)}>
           View
@@ -57,25 +57,26 @@ function SaleRow({ sale, onSelect }: { sale: Sale; onSelect: (sale: Sale) => voi
 
 export function SalesTable() {
   const [selectedSale, setSelectedSale] = React.useState<Sale | null>(null);
-  const { user } = useUser();
-  const firestore = useFirestore();
+  const [currentUser, setCurrentUser] = React.useState<UserProfile | null>(null);
+  const { data: sales, isLoading } = useCollection<Sale>('/api/sales');
 
-  const salesQuery = useMemoFirebase(
-    () => {
-      if (!user) return null; // Guard query until user is loaded
+  React.useEffect(() => {
+    const user = sessionStorage.getItem('currentUser');
+    if (user) {
+      setCurrentUser(JSON.parse(user));
+    }
+  }, []);
 
-      const salesCollection = collection(firestore, 'sales');
-      // Admin users see all sales, sorted by date.
-      if (user.role === 'Administration' || user.role === 'Super Administration') {
-        return query(salesCollection, orderBy('date', 'desc'));
-      }
-      // Sales users see only their own sales, sorted by date.
-      return query(salesCollection, where('userId', '==', user.id), orderBy('date', 'desc'));
-    },
-    [firestore, user]
-  );
-  
-  const { data: sales, isLoading } = useCollection<Sale>(salesQuery);
+  const filteredSales = React.useMemo(() => {
+    if (!sales || !currentUser) return sales || [];
+    
+    // Admin users see all sales
+    if (currentUser.role === 'Administration' || currentUser.role === 'Super Administration') {
+      return sales;
+    }
+    // Sales users see only their own sales
+    return sales.filter(sale => sale.userId === currentUser.id);
+  }, [sales, currentUser]);
 
   const handleCloseModal = () => {
     setSelectedSale(null);
@@ -106,8 +107,8 @@ export function SalesTable() {
                   <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
                 </TableCell>
               </TableRow>
-            ) : sales && sales.length > 0 ? (
-            sales.map((sale) => (
+            ) : filteredSales && filteredSales.length > 0 ? (
+            filteredSales.map((sale) => (
               <SaleRow key={sale.id} sale={sale} onSelect={setSelectedSale} />
             ))) : (
               <TableRow>

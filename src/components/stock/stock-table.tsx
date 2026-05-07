@@ -11,11 +11,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
 import type { Product } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { useCollection } from '@/hooks/use-db-collection';
 
 type StockCount = {
   productId: string;
@@ -28,9 +27,7 @@ interface StockTableProps {
 }
 
 export function StockTable({ onCountChange, stockCounts }: StockTableProps) {
-  const firestore = useFirestore();
-  const productsQuery = useMemoFirebase(() => collection(firestore, 'products'), [firestore]);
-  const { data: products, isLoading } = useCollection<Product>(productsQuery);
+  const { data: products, isLoading } = useCollection<Product>('/api/products');
 
   const getStockStatus = (stock: number, lowStockThreshold: number) => {
     if (stock === 0) return 'Out of Stock';

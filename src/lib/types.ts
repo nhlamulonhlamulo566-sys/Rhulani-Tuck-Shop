@@ -2,7 +2,8 @@ export type UserProfile = {
   id: string; // Firestore Document ID
   firstName: string;
   lastName: string;
-  email: string;
+  workNumber: string;
+  email?: string;
   password?: string; // Storing password directly as requested
   role: 'Administration' | 'Sales' | 'Super Administration';
   pin?: string; // 6-digit PIN for admins to authorize actions
@@ -47,9 +48,10 @@ export type Sale = {
   amountPaid?: number; // Optional for withdrawal
   change?: number; // Optional for withdrawal
   salesperson: string;
-  status: 'Completed' | 'Voided' | 'Returned' | 'Partially Returned' | 'Withdrawal';
-  transactionType?: 'sale' | 'withdrawal' | 'airtime' | 'electricity' | 'voucher'; // To distinguish between sales and withdrawals and purchases
-  withdrawalReason?: string; // Reason for withdrawal
+  status: 'Completed' | 'Voided' | 'Returned' | 'Partially Returned';
+  transactionType?: 'sale' | 'voucher' | 'withdrawal' | 'void' | 'return'; // Transaction types including withdrawals, voids, and returns
+  withdrawalReason?: string; // Reason for withdrawal (kept for historical data compatibility)
+  voucherNumber?: string; // Auto-generated unique voucher identifier (VC-TIMESTAMP-RANDOM)
   cardTransactionId?: string; // Card payment transaction ID (locally generated)
   authorizations?: {
     userId: string;
@@ -70,12 +72,41 @@ export type TillSession = {
     startDate: string;
     openingBalance: number;
     endDate?: string;
-    expectedCash?: number;
-    countedCash?: number;
-    difference?: number;
+    closingBalance?: number; // Sales person must enter this
+    expectedCash?: number; // Opening balance + sales - withdrawals
+    countedCash?: number; // Actual cash counted
+    difference?: number; // Difference between expected and counted
     status: 'Active' | 'Closed';
-    userId: string; // The admin who started/ended the session
+    userId: string; // The sales person or admin
     userName: string;
+    reconciled?: boolean; // Whether balance matches
+    startedBy?: string; // Admin who opened the till
+    closedBy?: string; // Admin who closed the till (same admin must also open and close)
+    transactions?: Array<{
+        type: 'sale' | 'withdrawal' | 'void' | 'return';
+        amount: number;
+        timestamp: string;
+    }>;
+};
+
+export type SalesShift = {
+    id: string;
+    userId: string;
+    userName: string;
+    date: string;
+    startTime: string;
+    endTime?: string;
+    openingBalance: number;
+    closingBalance?: number; // Sales person enters at end of shift
+    totalSales: number; // Sum of all completed sales
+    totalWithdrawals: number; // Sum of all withdrawals
+    totalVoids: number; // Sum of voided sales
+    totalReturns: number; // Sum of returned items
+    expectedBalance?: number; // Opening + Sales - Withdrawals - Voids - Returns
+    actualBalance?: number; // What sales person reports
+    difference?: number; // Discrepancy between expected and actual
+    status: 'Open' | 'Closed';
+    reconciled: boolean;
 };
 
     

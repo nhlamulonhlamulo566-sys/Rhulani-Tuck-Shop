@@ -13,6 +13,7 @@ export const mockUser: UserProfile = {
   id: 'user-1',
   firstName: 'Alex',
   lastName: 'Doe',
+  workNumber: '12345678',
   email: 'alex.doe@example.com',
   role: 'Administration',
   createdAt: new Date().toISOString(),

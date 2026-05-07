@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
+import { useCollection } from '@/hooks/use-db-collection';
+import { toMoney } from '@/lib/format-utils';
 import type { Sale, UserProfile } from '@/lib/types';
 import { startOfToday, startOfWeek, startOfMonth, endOfToday, endOfWeek, endOfMonth, isWithinInterval } from 'date-fns';
 import { Loader2, User, Ban, Undo2, Users, Wallet } from 'lucide-react';
@@ -43,7 +43,7 @@ const emptyPeriodTotals: PeriodTotals = {
 const StatDisplay = ({ title, amount }: { title: string; amount: number }) => (
   <div className="flex justify-between items-center text-sm">
     <p className="text-muted-foreground">{title}</p>
-    <p className="font-medium">R{amount.toFixed(2)}</p>
+    <p className="font-medium">R{toMoney(amount)}</p>
   </div>
 );
 
@@ -60,7 +60,7 @@ const TotalsCard = ({ title, stats }: { title: string; stats: PaymentStats }) =>
       <Separator />
       <div className="flex justify-between font-bold text-lg">
         <span>Net Sales</span>
-        <span>R{stats.total.toFixed(2)}</span>
+        <span>R{toMoney(stats.total)}</span>
       </div>
     </CardContent>
   </Card>
@@ -90,7 +90,7 @@ const AdjustmentCard = ({ title, amount, icon: Icon }: { title: string; amount: 
       </CardTitle>
     </CardHeader>
     <CardContent>
-      <p className="text-2xl font-bold">R{amount.toFixed(2)}</p>
+      <p className="text-2xl font-bold">R{toMoney(amount)}</p>
       <p className="text-xs text-muted-foreground">Total value for this period</p>
     </CardContent>
   </Card>
@@ -109,13 +109,8 @@ const PeriodSection = ({ title, stats }: { title: string; stats: PaymentStats })
   );
 
 export default function CashUpPage() {
-  const firestore = useFirestore();
-
-  const salesQuery = useMemoFirebase(() => query(collection(firestore, 'sales')), [firestore]);
-  const { data: sales, isLoading: salesLoading } = useCollection<Sale>(salesQuery);
-  
-  const usersQuery = useMemoFirebase(() => query(collection(firestore, 'users')), [firestore]);
-  const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);
+  const { data: sales, isLoading: salesLoading } = useCollection<Sale>('/api/sales');
+  const { data: users, isLoading: usersLoading } = useCollection<UserProfile>('/api/users');
 
   const salespersonTotals: SalespersonTotals = useMemo(() => {
     const initialData: SalespersonTotals = {};
@@ -236,11 +231,11 @@ export default function CashUpPage() {
                     </div>
                 </AccordionTrigger>
                 <AccordionContent className="p-6 pt-0 space-y-8">
-                    <PeriodSection title="Today's Summary" stats={salespersonTotals[salesperson].today} />
+                    <PeriodSection title="Summary for Today" stats={salespersonTotals[salesperson].today} />
                     <Separator />
-                    <PeriodSection title="This Week's Summary" stats={salespersonTotals[salesperson].thisWeek} />
+                    <PeriodSection title="Summary This Week" stats={salespersonTotals[salesperson].thisWeek} />
                     <Separator />
-                    <PeriodSection title="This Month's Summary" stats={salespersonTotals[salesperson].thisMonth} />
+                    <PeriodSection title="Summary This Month" stats={salespersonTotals[salesperson].thisMonth} />
                 </AccordionContent>
                 </AccordionItem>
             ))}
@@ -258,11 +253,11 @@ export default function CashUpPage() {
                 <CardDescription>A combined summary of all sales activity across all staff members.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
-                <PeriodSection title="Today's Grand Total" stats={grandTotals.today} />
+                <PeriodSection title="Grand Total Today" stats={grandTotals.today} />
                 <Separator />
-                <PeriodSection title="This Week's Grand Total" stats={grandTotals.thisWeek} />
+                <PeriodSection title="Grand Total This Week" stats={grandTotals.thisWeek} />
                 <Separator />
-                <PeriodSection title="This Month's Grand Total" stats={grandTotals.thisMonth} />
+                <PeriodSection title="Grand Total This Month" stats={grandTotals.thisMonth} />
             </CardContent>
         </Card>
       </div>
