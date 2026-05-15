@@ -2,7 +2,7 @@
 
 **Date:** April 24, 2026  
 **Status:** ✅ COMPLETE - Ready to Use  
-**Database:** MySQL rhulanituckshop (ngrok: 0.tcp.sa.ngrok.io:26175)
+**Database:** MySQL rhulanituckshop (ngrok: ub97v8fdrt.localto.net:2379)
 
 ---
 
@@ -23,7 +23,7 @@ Your Rhulani Tuck Shop application has been **fully migrated from Firebase to a 
 
 ### Connection Details
 ```
-Host:     0.tcp.sa.ngrok.io
+Host:     ub97v8fdrt.localto.net
 Port:     19359
 Database: rhulanituckshop
 Username: jeff
@@ -175,8 +175,8 @@ Password: 0813210332@Jeff
 ### `.env.local`
 Added MySQL connection credentials:
 ```env
-DATABASE_HOST=0.tcp.sa.ngrok.io
-DATABASE_PORT=26175
+DATABASE_HOST=ub97v8fdrt.localto.net
+DATABASE_PORT=2379
 DATABASE_NAME=rhulanituckshop
 DATABASE_USER=jeff
 DATABASE_PASSWORD=0813210332@Jeff
@@ -239,7 +239,7 @@ const { data: products } = useCollection<Product>('/api/products');
 ## Troubleshooting Guide
 
 ### Connection Fails
-1. Check ngrok tunnel is active: `0.tcp.sa.ngrok.io:26175`
+1. Check ngrok tunnel is active: `ub97v8fdrt.localto.net:2379`
 2. Verify MySQL server is running
 3. Check credentials in `.env.local`
 4. Test connection: `npm run dev` should start without errors
@@ -313,4 +313,5 @@ All systems are configured and ready. Database initialization and testing can be
 *Generated: April 24, 2026*  
 *Application: Rhulani Tuck Shop*  
 *Database: MySQL rhulanituckshop*  
-*Connection: ngrok (0.tcp.sa.ngrok.io:26175)*
+*Connection: ngrok (ub97v8fdrt.localto.net:2379)*
+

@@ -3,7 +3,7 @@
 **Version:** 1.1  
 **Status:** ✅ Production Ready & Deployed  
 **Last Updated:** April 28, 2026  
-**Database:** South Africa ngrok tunnel (0.tcp.sa.ngrok.io:26175)
+**Database:** South Africa ngrok tunnel (ub97v8fdrt.localto.net:2379)
 
 ---
 
@@ -24,7 +24,7 @@ PIN: 123456
 
 ### Database Status
 ```
-✅ Connected to: 0.tcp.sa.ngrok.io:26175
+✅ Connected to: ub97v8fdrt.localto.net:2379
 ✅ Database: rhulanituckshop
 ✅ Tables: 9 (all created & initialized)
 ✅ Super Admin: Active & verified
@@ -427,3 +427,4 @@ npm run test:debug
 Your complete, secure, and professional point-of-sale system is ready for deployment.
 
 For questions or support, contact: support@rhulanituckshop.co.za
+

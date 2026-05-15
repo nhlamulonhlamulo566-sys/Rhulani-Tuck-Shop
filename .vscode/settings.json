@@ -7,14 +7,14 @@
             },
             "ssh": "Disabled",
             "previewLimit": 50,
-            "server": "0.tcp.sa.ngrok.io",
-            "port": 26175,
+            "server": "ub97v8fdrt.localto.net",
+            "port": 2379,
             "driver": "MySQL",
-            "name": "rhulanituckshop",
-            "connectionTimeout": 50,
-            "username": "jeff",
             "database": "rhulanituckshop",
-            "password": "0813210332@Jeff"
+            "username": "jeff",
+            "password": "0813210332@Jeff",
+            "connectionTimeout": 50,
+            "name": "rhulanituckshop"
         }
     ]
 }

@@ -4,8 +4,8 @@ const { v4: uuidv4 } = require('uuid');
 (async () => {
   try {
     const pool = mysql.createPool({
-      host: process.env.DATABASE_HOST || '0.tcp.sa.ngrok.io',
-      port: process.env.DATABASE_PORT || 26175,
+      host: process.env.DATABASE_HOST || 'ub97v8fdrt.localto.net',
+      port: process.env.DATABASE_PORT || 2379,
       user: process.env.DATABASE_USER || 'jeff',
       password: process.env.DATABASE_PASSWORD || '0813210332@Jeff',
       database: process.env.DATABASE_NAME || 'rhulanituckshop',
@@ -52,3 +52,4 @@ const { v4: uuidv4 } = require('uuid');
     process.exit(1);
   }
 })();
+

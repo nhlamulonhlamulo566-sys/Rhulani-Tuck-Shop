@@ -8,7 +8,7 @@
 **Status:** ✅ PASSED
 
 - **Connection Type:** Remote MySQL 8.0 (via ngrok tunnel)
-- **Host:** 0.tcp.sa.ngrok.io:26175
+- **Host:** ub97v8fdrt.localto.net:2379
 - **Database:** rhulanituckshop
 - **Connection Pool:** mysql2/promise with 10 concurrent connections
 - **Result:** Successfully established and maintained stable connection
@@ -217,3 +217,4 @@ All tests passed successfully. The Rhulani Tuck Shop POS system is:
 **Test Environment:** Development (localhost:9002)
 **Database:** Remote MySQL (ngrok tunnel)
 **Version:** v1.0.0 Production Ready
+

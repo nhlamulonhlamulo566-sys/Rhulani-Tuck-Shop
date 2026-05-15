@@ -301,8 +301,8 @@ Frontend: Compare entered PIN with stored PIN
 ### Environment Variables
 No new environment variables needed. Uses existing:
 ```
-DATABASE_HOST=0.tcp.sa.ngrok.io
-DATABASE_PORT=26175
+DATABASE_HOST=ub97v8fdrt.localto.net
+DATABASE_PORT=2379
 DATABASE_NAME=rhulanituckshop
 DATABASE_USER=jeff
 DATABASE_PASSWORD=0813210332@Jeff
@@ -311,7 +311,7 @@ DATABASE_PASSWORD=0813210332@Jeff
 ### Database Migration
 Run the migration script to add the new column:
 ```bash
-mysql -h 0.tcp.sa.ngrok.io -P 26175 -u jeff -p < docs/ADMIN_PIN_MIGRATION.sql
+mysql -h ub97v8fdrt.localto.net -P 2379 -u jeff -p < docs/ADMIN_PIN_MIGRATION.sql
 ```
 
 Or manually run:

@@ -1,8 +1,8 @@
 const mysql = require('mysql2/promise');
 
 const pool = mysql.createPool({
-  host: process.env.DATABASE_HOST || '0.tcp.sa.ngrok.io',
-  port: parseInt(process.env.DATABASE_PORT || '26175'),
+  host: process.env.DATABASE_HOST || 'ub97v8fdrt.localto.net',
+  port: parseInt(process.env.DATABASE_PORT || '2379'),
   database: process.env.DATABASE_NAME || 'rhulanituckshop',
   user: process.env.DATABASE_USER || 'jeff',
   password: process.env.DATABASE_PASSWORD || '0813210332@Jeff',
@@ -47,3 +47,4 @@ const pool = mysql.createPool({
     pool.end();
   }
 })();
+

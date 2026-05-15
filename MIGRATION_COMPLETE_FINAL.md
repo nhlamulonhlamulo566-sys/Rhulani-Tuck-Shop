@@ -110,8 +110,8 @@ All 16+ endpoints are fully operational:
 **Status:** ✅ Ready to Use
 
 ```
-Host:     0.tcp.sa.ngrok.io
-Port:     19359
+Host:     ub97v8fdrt.localto.net
+Port:     2379
 Database: rhulanituckshop
 Username: jeff
 Password: 0813210332@Jeff

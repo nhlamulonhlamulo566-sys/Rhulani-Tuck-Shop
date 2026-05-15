@@ -18,8 +18,8 @@ async function testDatabase() {
   try {
     console.log('1️⃣  Connecting to database...');
     connection = await mysql.createConnection({
-      host: '0.tcp.sa.ngrok.io',
-      port: 26175,
+      host: 'ub97v8fdrt.localto.net',
+      port: 2379,
       user: 'jeff',
       password: '0813210332@Jeff',
       database: 'rhulanituckshop',
